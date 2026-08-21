@@ -6,8 +6,7 @@ running Linux kernel.
 Terrahive is a Terraform provider that treats the kernel as infrastructure.
 You declare a BPF program, a map, or a probe as an HCL resource. `apply` loads
 and attaches it. `plan` reads the kernel back and shows real drift. `destroy`
-unloads it. The workflow you already use for cloud servers, pointed at the
-machine's own kernel instead of a remote API.
+unloads it. The workflow you already use for cloud servers.
 
 ```hcl
 resource "ebpf_program" "trace_open" {
