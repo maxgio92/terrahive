@@ -66,7 +66,10 @@ func (p *TerrahiveProvider) Configure(ctx context.Context, req provider.Configur
 }
 
 func (p *TerrahiveProvider) Resources(_ context.Context) []func() resource.Resource {
-	return nil
+	return []func() resource.Resource{
+		newMapResource,
+		newMapEntryResource,
+	}
 }
 
 func (p *TerrahiveProvider) DataSources(_ context.Context) []func() datasource.DataSource {
