@@ -76,18 +76,44 @@ func LoadELF(obj []byte) (*ebpf.ProgramSpec, error) {
 	panic("unreachable")
 }
 
-// LoadAndPinProgram loads a program into the kernel and pins it,
-// returning the kernel-computed program tag.
-func (h *Hive) LoadAndPinProgram(spec *ebpf.ProgramSpec, pinPath string) (string, error) {
-	prog, err := ebpf.NewProgram(spec)
+// LoadAndPinProgram loads the object's single program together with the
+// maps it references and pins the program, returning the kernel-computed
+// tag. Referenced maps are pinned by name under the hive map directory,
+// so several programs (and an ebpf_map of the same name) share one kernel
+// map through a stable bpffs pin. The object must hold exactly one
+// program; callers gate that with LoadELF.
+func (h *Hive) LoadAndPinProgram(obj []byte, pinPath string) (string, error) {
+	spec, err := ebpf.LoadCollectionSpecFromReader(bytes.NewReader(obj))
+	if err != nil {
+		return "", fmt.Errorf("parsing BPF object: %w", err)
+	}
+	for _, m := range spec.Maps {
+		m.Pinning = ebpf.PinByName
+	}
+
+	mapDir := h.PinPath("map")
+	if err := os.MkdirAll(mapDir, 0o755); err != nil {
+		return "", fmt.Errorf("creating map pin directory: %w", err)
+	}
+	coll, err := ebpf.NewCollectionWithOptions(spec, ebpf.CollectionOptions{
+		Maps: ebpf.MapOptions{PinPath: mapDir},
+	})
 	if err != nil {
 		var verr *ebpf.VerifierError
 		if errors.As(err, &verr) {
-			return "", fmt.Errorf("kernel rejected program %q: %+v", spec.Name, verr)
+			return "", fmt.Errorf("kernel rejected program: %+v", verr)
 		}
-		return "", fmt.Errorf("loading program %q: %w", spec.Name, err)
+		return "", fmt.Errorf("loading BPF collection: %w", err)
 	}
-	defer func() { _ = prog.Close() }()
+	defer coll.Close()
+
+	var prog *ebpf.Program
+	for _, p := range coll.Programs {
+		prog = p
+	}
+	if prog == nil {
+		return "", errors.New("BPF object contains no programs")
+	}
 
 	if err := os.MkdirAll(filepath.Dir(pinPath), 0o755); err != nil {
 		return "", fmt.Errorf("creating pin directory: %w", err)

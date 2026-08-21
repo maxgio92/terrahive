@@ -2,11 +2,16 @@ package provider
 
 import (
 	"context"
+	"path/filepath"
+	"strings"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
@@ -45,15 +50,26 @@ func TestProgramResourceSchemaForcesReplacement(t *testing.T) {
 		if !ok {
 			t.Fatalf("%s is not a string attribute", name)
 		}
-		if len(attr.PlanModifiers) == 0 {
+		if !hasRequiresReplaceString(attr.PlanModifiers) {
 			t.Fatalf("%s has no RequiresReplace plan modifier", name)
 		}
 	}
 }
 
-func programConfig(t *testing.T, values map[string]tftypes.Value) tfsdk.Config {
+// hasRequiresReplaceString reports whether the modifiers include a
+// RequiresReplace variant, matched by its description rather than by the
+// mere presence of some modifier.
+func hasRequiresReplaceString(mods []planmodifier.String) bool {
+	for _, m := range mods {
+		if strings.Contains(m.Description(context.Background()), "destroy and recreate the resource") {
+			return true
+		}
+	}
+	return false
+}
+
+func programObject(t *testing.T, s schema.Schema, values map[string]tftypes.Value) tftypes.Value {
 	t.Helper()
-	s := programSchema(t)
 	objType := s.Type().TerraformType(context.Background()).(tftypes.Object)
 	full := map[string]tftypes.Value{}
 	for name, attrType := range objType.AttributeTypes {
@@ -63,7 +79,64 @@ func programConfig(t *testing.T, values map[string]tftypes.Value) tfsdk.Config {
 			full[name] = tftypes.NewValue(attrType, nil)
 		}
 	}
-	return tfsdk.Config{Raw: tftypes.NewValue(objType, full), Schema: s}
+	return tftypes.NewValue(objType, full)
+}
+
+func programConfig(t *testing.T, values map[string]tftypes.Value) tfsdk.Config {
+	t.Helper()
+	s := programSchema(t)
+	return tfsdk.Config{Raw: programObject(t, s, values), Schema: s}
+}
+
+// TestProgramModifyPlanKeepsSourceHashWhenObjectFileMissing proves a
+// cleaned build artifact does not force a perpetual "known after apply"
+// diff: ModifyPlan keeps the recorded source_hash from state.
+func TestProgramModifyPlanKeepsSourceHashWhenObjectFileMissing(t *testing.T) {
+	s := programSchema(t)
+	missing := filepath.Join(t.TempDir(), "gone.o")
+	const priorHash = "abc123"
+
+	fields := map[string]tftypes.Value{
+		"name":        tftypes.NewValue(tftypes.String, "prog"),
+		"object_file": tftypes.NewValue(tftypes.String, missing),
+		"type":        tftypes.NewValue(tftypes.String, "kprobe"),
+		"id":          tftypes.NewValue(tftypes.String, "/sys/fs/bpf/terrahive/program/prog"),
+		"tag":         tftypes.NewValue(tftypes.String, "tag"),
+	}
+	planFields := map[string]tftypes.Value{}
+	stateFields := map[string]tftypes.Value{}
+	for k, v := range fields {
+		planFields[k] = v
+		stateFields[k] = v
+	}
+	planFields["source_hash"] = tftypes.NewValue(tftypes.String, tftypes.UnknownValue)
+	stateFields["source_hash"] = tftypes.NewValue(tftypes.String, priorHash)
+
+	planObj := programObject(t, s, planFields)
+	req := resource.ModifyPlanRequest{
+		Config: tfsdk.Config{Raw: programObject(t, s, planFields), Schema: s},
+		Plan:   tfsdk.Plan{Raw: planObj, Schema: s},
+		State:  tfsdk.State{Raw: programObject(t, s, stateFields), Schema: s},
+	}
+	resp := resource.ModifyPlanResponse{Plan: tfsdk.Plan{Raw: planObj, Schema: s}}
+
+	r := NewProgramResource().(*programResource)
+	r.ModifyPlan(context.Background(), req, &resp)
+	if resp.Diagnostics.HasError() {
+		t.Fatalf("unexpected diagnostics: %v", resp.Diagnostics)
+	}
+
+	var got types.String
+	resp.Diagnostics.Append(resp.Plan.GetAttribute(context.Background(), path.Root("source_hash"), &got)...)
+	if resp.Diagnostics.HasError() {
+		t.Fatalf("reading planned source_hash: %v", resp.Diagnostics)
+	}
+	if got.IsUnknown() || got.ValueString() != priorHash {
+		t.Fatalf("planned source_hash = %v, want %q", got, priorHash)
+	}
+	if len(resp.RequiresReplace) != 0 {
+		t.Fatalf("unexpected RequiresReplace: %v", resp.RequiresReplace)
+	}
 }
 
 // validateGoSourceConfig runs ValidateConfig on a go_source-only

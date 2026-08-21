@@ -30,6 +30,31 @@ int hive_probe(void *ctx) { return 1; }
 char __license[] __attribute__((section("license"), used)) = "GPL";
 `
 
+// accSharedMapSource declares a legacy-style pinned map named "counters"
+// and reads it from a kprobe. Two programs built from it must share the
+// one kernel map pinned by an ebpf_map of the same name.
+const accSharedMapSource = `
+struct bpf_map_def {
+	unsigned int type;
+	unsigned int key_size;
+	unsigned int value_size;
+	unsigned int max_entries;
+	unsigned int map_flags;
+};
+static void *(*bpf_map_lookup_elem)(void *map, const void *key) = (void *)1;
+struct bpf_map_def counters __attribute__((section("maps"), used)) = {
+	.type = 1, .key_size = 4, .value_size = 8, .max_entries = 16,
+};
+__attribute__((section("kprobe/do_sys_openat2"), used))
+int hive_probe(void *ctx) {
+	unsigned int k = 0;
+	unsigned long long *v = bpf_map_lookup_elem(&counters, &k);
+	if (v) (*v)++;
+	return 0;
+}
+char __license[] __attribute__((section("license"), used)) = "GPL";
+`
+
 var accProtoV6Factories = map[string]func() (tfprotov6.ProviderServer, error){
 	"ebpf": providerserver.NewProtocol6WithError(New("test")()),
 }
@@ -201,6 +226,100 @@ resource "ebpf_program" "probe" {
 			},
 		},
 	})
+}
+
+// TestAccProgramSharedMap proves task 3.3: two ebpf_program resources
+// that reference the same map name share the one kernel map pinned by an
+// ebpf_map of that name.
+func TestAccProgramSharedMap(t *testing.T) {
+	pinDir := accPinDir(t)
+	mapPin := filepath.Join(pinDir, "map", "counters")
+	progA := filepath.Join(pinDir, "program", "reader_a")
+	progB := filepath.Join(pinDir, "program", "reader_b")
+
+	config := accProviderBlock(pinDir) + fmt.Sprintf(`
+resource "ebpf_map" "shared" {
+  name        = "counters"
+  type        = "hash"
+  key_size    = 4
+  value_size  = 8
+  max_entries = 16
+}
+
+resource "ebpf_program" "a" {
+  name       = "reader_a"
+  type       = "kprobe"
+  c_source   = %[1]q
+  depends_on = [ebpf_map.shared]
+}
+
+resource "ebpf_program" "b" {
+  name       = "reader_b"
+  type       = "kprobe"
+  c_source   = %[1]q
+  depends_on = [ebpf_map.shared]
+}
+`, accSharedMapSource)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { accPreCheck(t) },
+		ProtoV6ProviderFactories: accProtoV6Factories,
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("ebpf_program.a", "id", progA),
+					resource.TestCheckResourceAttr("ebpf_program.b", "id", progB),
+					checkProgramsShareMap(mapPin, progA, progB),
+				),
+			},
+		},
+	})
+}
+
+// checkProgramsShareMap asserts every program pin references the kernel
+// map behind mapPin.
+func checkProgramsShareMap(mapPin string, progPins ...string) resource.TestCheckFunc {
+	return func(*terraform.State) error {
+		m, err := ebpf.LoadPinnedMap(mapPin, nil)
+		if err != nil {
+			return fmt.Errorf("loading pinned map %s: %w", mapPin, err)
+		}
+		defer func() { _ = m.Close() }()
+		mi, err := m.Info()
+		if err != nil {
+			return fmt.Errorf("map info %s: %w", mapPin, err)
+		}
+		wantID, ok := mi.ID()
+		if !ok {
+			return fmt.Errorf("kernel does not expose an ID for map %s", mapPin)
+		}
+		for _, pp := range progPins {
+			p, err := ebpf.LoadPinnedProgram(pp, nil)
+			if err != nil {
+				return fmt.Errorf("loading pinned program %s: %w", pp, err)
+			}
+			pi, err := p.Info()
+			_ = p.Close()
+			if err != nil {
+				return fmt.Errorf("program info %s: %w", pp, err)
+			}
+			ids, ok := pi.MapIDs()
+			if !ok {
+				return fmt.Errorf("kernel does not expose map IDs for %s", pp)
+			}
+			found := false
+			for _, id := range ids {
+				if id == wantID {
+					found = true
+				}
+			}
+			if !found {
+				return fmt.Errorf("program %s does not reference shared map %v (references %v)", pp, wantID, ids)
+			}
+		}
+		return nil
+	}
 }
 
 func TestAccProgramDriftOnPinSwap(t *testing.T) {

@@ -72,6 +72,7 @@ func (r *programResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			"name": schema.StringAttribute{
 				Required:    true,
 				Description: "Program name, used as the last pin path element.",
+				Validators:  pinNameValidators(),
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
@@ -154,11 +155,18 @@ func (r *programResource) ModifyPlan(ctx context.Context, req resource.ModifyPla
 	if req.Plan.Raw.IsNull() {
 		return
 	}
-	var plan, config programModel
+	var plan, config, state programModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+	hasState := !req.State.Raw.IsNull()
+	if hasState {
+		resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
 	}
 
 	hash := types.StringUnknown()
@@ -167,7 +175,13 @@ func (r *programResource) ModifyPlan(ctx context.Context, req resource.ModifyPla
 	case known(plan.ObjectFile):
 		obj, err := os.ReadFile(plan.ObjectFile.ValueString())
 		if err != nil {
-			// The file may be produced by another resource at apply time.
+			// The object file may be produced by another resource at
+			// apply time, or cleaned after a prior apply. When state
+			// already recorded a hash, keep it rather than forcing a
+			// perpetual "known after apply" diff on a missing artifact.
+			if hasState && known(state.SourceHash) {
+				hash = state.SourceHash
+			}
 			break
 		}
 		hash = types.StringValue(hive.SourceHash(obj))
@@ -195,12 +209,7 @@ func (r *programResource) ModifyPlan(ctx context.Context, req resource.ModifyPla
 	}
 	resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, path.Root("source_hash"), hash)...)
 
-	if req.State.Raw.IsNull() {
-		return
-	}
-	var state programModel
-	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
-	if resp.Diagnostics.HasError() {
+	if !hasState {
 		return
 	}
 	if known(hash) && known(state.SourceHash) && hash.ValueString() != state.SourceHash.ValueString() {
@@ -278,7 +287,7 @@ func (r *programResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
-	tag, err := r.hive.LoadAndPinProgram(spec, pinPath)
+	tag, err := r.hive.LoadAndPinProgram(obj, pinPath)
 	if err != nil {
 		resp.Diagnostics.AddError("loading BPF program failed", err.Error())
 		return
