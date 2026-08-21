@@ -1,6 +1,6 @@
 module github.com/maxgio92/terrahive
 
-go 1.25.8
+go 1.25.13
 
 require (
 	github.com/cilium/ebpf v0.22.0
