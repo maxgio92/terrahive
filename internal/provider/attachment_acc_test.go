@@ -447,6 +447,27 @@ resource "ebpf_kprobe" "test" {
 	})
 }
 
+// TestAccStructOps stays skipped: a real struct_ops attach needs a
+// BTF-defined struct_ops map, and the machine cannot build one.
+//
+// The asm package cannot express a struct_ops map, so the target must
+// come from a compiled object. A safe, self-registering target is a BPF
+// tcp_congestion_ops (a minimal congestion control): registering it adds
+// a CA to the kernel list without changing default behavior, and destroy
+// unregisters it. Compiling that needs vmlinux.h (the exact
+// tcp_congestion_ops and struct sock layout for the running kernel) plus
+// libbpf's bpf_helpers.h and the SEC macros.
+//
+// A real test would: run bpftool to dump vmlinux.h from /sys/kernel/btf/vmlinux,
+// clang-compile a minimal tcp_congestion_ops object against it and libbpf
+// headers, load and pin the struct_ops map with cilium/ebpf, then drive
+// ebpf_struct_ops to attach the pinned map and assert the link pin appears
+// and is gone after destroy (mirroring attachmentSteps and checkDestroyed).
+//
+// This machine has /sys/kernel/btf/vmlinux but no bpftool and no libbpf
+// headers, so the object cannot be built here. Hand-declaring the kernel
+// types to skip bpftool is too fragile: it breaks on any layout change
+// across kernels.
 func TestAccStructOps(t *testing.T) {
-	t.Skip("struct_ops needs a BTF-defined struct_ops map (e.g. a BPF TCP congestion control) compiled from a full object file; no safe target can be assembled with the asm package")
+	t.Skip("struct_ops needs a BTF-defined tcp_congestion_ops object; this machine lacks bpftool and libbpf headers to build one (see comment)")
 }

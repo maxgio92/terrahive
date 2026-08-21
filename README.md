@@ -267,6 +267,29 @@ resource "ebpf_kprobe" "counter" {
 
 Per-resource reference lives under [docs/resources/](docs/resources/).
 
+## Testing
+
+- `make test`: unit tests, lean and bumble.
+- `make cover`: unit tests under the race detector with a coverage profile
+  (`coverage.out`), then a per-function coverage report.
+- `make fuzz`: runs each fuzz target briefly (`FUZZTIME` bounds each one).
+  The targets cover the parsers that take untrusted input: the ELF loader,
+  the stapsdt USDT note decoder, and the map-entry ID and base64 decode path.
+- `make validate-examples`: builds the provider and runs `terraform init
+  -backend=false` plus `terraform validate` on each example root module,
+  offline, through Terraform dev_overrides (see
+  [scripts/validate-examples.sh](scripts/validate-examples.sh)). Modules that
+  use `go_source` validate against a bumble binary.
+- `make e2e`: a real `terraform apply` and `terraform destroy` of the built
+  provider through the CLI, loading an object file and attaching a kprobe,
+  asserting the pins appear and are gone after destroy. It is a script
+  ([scripts/e2e.sh](scripts/e2e.sh)) rather than a Go test: it drives the
+  built binary through the Terraform CLI, which the in-process
+  `terraform-plugin-testing` acceptance tests do not. It needs root and
+  bpffs, so run `sudo -E make e2e`; it skips with a message otherwise.
+- `make testacc`: the in-process acceptance tests; run `sudo -E TF_ACC=1 make
+  testacc`.
+
 ## Caveats
 
 Read these before you rely on terrahive:

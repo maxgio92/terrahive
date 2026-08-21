@@ -5,7 +5,10 @@ TINYGO_ARCH ?= amd64
 TINYGO_URL = https://github.com/tinygo-org/tinygo/releases/download/v$(TINYGO_VERSION)/tinygo$(TINYGO_VERSION).linux-$(TINYGO_ARCH).tar.gz
 TOOLCHAIN_DIR = internal/hive/tinygo/toolchain
 
-.PHONY: build build-bumble fetch-tinygo test testacc lint docs
+.PHONY: build build-bumble fetch-tinygo test testacc cover fuzz validate-examples e2e lint docs
+
+# FUZZTIME bounds each target in the fuzz aggregate below.
+FUZZTIME ?= 15s
 
 build:
 	go build ./...
@@ -32,6 +35,33 @@ test:
 
 testacc:
 	TF_ACC=1 go test ./... -v -timeout 20m
+
+# Runs the unit tests under the race detector and writes a coverage
+# profile. The fetched TinyGo tree is underscore-prefixed, so ./... never
+# reaches it.
+cover:
+	go test -race -covermode=atomic -coverprofile=coverage.out ./...
+	go tool cover -func=coverage.out
+
+# Runs each fuzz target briefly to catch parser panics on untrusted input
+# (ELF objects, stapsdt notes, map-entry IDs). Bump FUZZTIME for longer
+# runs.
+fuzz:
+	go test ./internal/hive -run=^$$ -fuzz=^FuzzLoadELF$$ -fuzztime=$(FUZZTIME)
+	go test ./internal/hive -run=^$$ -fuzz=^FuzzScanStapsdtNotes$$ -fuzztime=$(FUZZTIME)
+	go test ./internal/provider -run=^$$ -fuzz=^FuzzMapEntryID$$ -fuzztime=$(FUZZTIME)
+	go test ./internal/provider -run=^$$ -fuzz=^FuzzMapEntryValueDecode$$ -fuzztime=$(FUZZTIME)
+
+# Validates every example root module offline against a locally built
+# provider using Terraform dev_overrides. See scripts/validate-examples.sh.
+validate-examples:
+	./scripts/validate-examples.sh
+
+# True end-to-end apply/destroy of the built provider through the
+# Terraform CLI. Needs root and bpffs; skips with a message otherwise.
+# See scripts/e2e.sh.
+e2e:
+	./scripts/e2e.sh
 
 lint:
 	golangci-lint run
