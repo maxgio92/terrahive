@@ -2,11 +2,28 @@ package hive
 
 import (
 	"debug/elf"
+	"encoding/binary"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
 )
+
+// TestScanStapsdtNotesOversizedName guards the fix for a uint32 overflow:
+// a namesz near the maximum, once aligned in 32-bit arithmetic, wrapped to
+// a small value, slipped past the length check, then sliced out of range.
+// The decoder must reject it with an error instead of panicking.
+func TestScanStapsdtNotesOversizedName(t *testing.T) {
+	bo := binary.LittleEndian
+	data := make([]byte, 12+8)
+	bo.PutUint32(data[0:4], 0xFFFFFFFF) // namesz
+	bo.PutUint32(data[4:8], 0)          // descsz
+	bo.PutUint32(data[8:12], stapsdtNoteType)
+
+	if _, err := scanStapsdtNotes(data, bo); err == nil {
+		t.Fatal("expected an error for an oversized namesz, got nil")
+	}
+}
 
 // usdtFixture is what sys/sdt.h expands to: a stapsdt ELF note pointing
 // at a nop inside traced(), plus the .stapsdt.base anchor section. The

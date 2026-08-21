@@ -2,11 +2,23 @@ package hive
 
 import (
 	"debug/elf"
+	"encoding/binary"
+	"errors"
 	"fmt"
 )
 
 // stapsdtNoteType is the ELF note type of SystemTap SDT probe descriptors.
 const stapsdtNoteType = 3
+
+// stapsdtNote is one decoded record from a .note.stapsdt section, before
+// any prelink relocation or file-offset translation is applied.
+type stapsdtNote struct {
+	location  uint64
+	base      uint64
+	semaphore uint64
+	provider  string
+	name      string
+}
 
 // USDT locates a statically defined tracepoint inside an executable.
 type USDT struct {
@@ -46,37 +58,18 @@ func ResolveUSDT(path, provider, name string) (*USDT, error) {
 		actualBase = base.Addr
 	}
 
-	bo := f.ByteOrder
-	align4 := func(n uint32) uint32 { return (n + 3) &^ 3 }
-	for len(data) >= 12 {
-		namesz := bo.Uint32(data[0:4])
-		descsz := bo.Uint32(data[4:8])
-		typ := bo.Uint32(data[8:12])
-		data = data[12:]
-		if uint32(len(data)) < align4(namesz)+align4(descsz) {
-			return nil, fmt.Errorf("%s: truncated note in .note.stapsdt", path)
-		}
-		noteName := string(data[:namesz])
-		desc := data[align4(namesz) : align4(namesz)+descsz]
-		data = data[align4(namesz)+align4(descsz):]
-
-		if typ != stapsdtNoteType || noteName != "stapsdt\x00" || len(desc) < 24 {
+	notes, err := scanStapsdtNotes(data, f.ByteOrder)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", path, err)
+	}
+	for _, n := range notes {
+		if n.provider != provider || n.name != name {
 			continue
 		}
-		location := bo.Uint64(desc[0:8])
-		recordedBase := bo.Uint64(desc[8:16])
-		semaphore := bo.Uint64(desc[16:24])
-		noteProvider, rest, ok := cutNul(desc[24:])
-		if !ok {
-			continue
-		}
-		noteProbe, _, ok := cutNul(rest)
-		if !ok || noteProvider != provider || noteProbe != name {
-			continue
-		}
-
-		if actualBase != 0 && recordedBase != 0 {
-			delta := actualBase - recordedBase
+		location := n.location
+		semaphore := n.semaphore
+		if actualBase != 0 && n.base != 0 {
+			delta := actualBase - n.base
 			location += delta
 			if semaphore != 0 {
 				semaphore += delta
@@ -96,6 +89,52 @@ func ResolveUSDT(path, provider, name string) (*USDT, error) {
 		return usdt, nil
 	}
 	return nil, fmt.Errorf("usdt probe %s:%s not found in %s", provider, name, path)
+}
+
+// scanStapsdtNotes decodes the records of a .note.stapsdt section. It
+// parses untrusted section bytes, so all size fields widen to uint64
+// before any arithmetic: a 32-bit namesz or descsz near the maximum
+// would otherwise overflow when aligned and slip past the bounds check,
+// slicing out of range. Malformed input yields an error, never a panic.
+func scanStapsdtNotes(data []byte, bo binary.ByteOrder) ([]stapsdtNote, error) {
+	align4 := func(n uint64) uint64 { return (n + 3) &^ 3 }
+	var notes []stapsdtNote
+	for len(data) >= 12 {
+		namesz := uint64(bo.Uint32(data[0:4]))
+		descsz := uint64(bo.Uint32(data[4:8]))
+		typ := bo.Uint32(data[8:12])
+		data = data[12:]
+
+		nAligned := align4(namesz)
+		dAligned := align4(descsz)
+		if uint64(len(data)) < nAligned+dAligned {
+			return nil, errors.New("truncated note in .note.stapsdt")
+		}
+		noteName := string(data[:namesz])
+		desc := data[nAligned : nAligned+descsz]
+		data = data[nAligned+dAligned:]
+
+		if typ != stapsdtNoteType || noteName != "stapsdt\x00" || len(desc) < 24 {
+			continue
+		}
+		n := stapsdtNote{
+			location:  bo.Uint64(desc[0:8]),
+			base:      bo.Uint64(desc[8:16]),
+			semaphore: bo.Uint64(desc[16:24]),
+		}
+		noteProvider, rest, ok := cutNul(desc[24:])
+		if !ok {
+			continue
+		}
+		noteProbe, _, ok := cutNul(rest)
+		if !ok {
+			continue
+		}
+		n.provider = noteProvider
+		n.name = noteProbe
+		notes = append(notes, n)
+	}
+	return notes, nil
 }
 
 // fileOffset translates a virtual address into an offset within the
