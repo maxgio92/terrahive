@@ -193,8 +193,13 @@ func (r *mapEntryResource) Delete(ctx context.Context, req resource.DeleteReques
 	// Array-family maps have a fixed set of slots that cannot be deleted;
 	// the kernel returns EINVAL. Destroy still succeeds: the slot keeps
 	// its zero value, and the pin is torn down with the ebpf_map resource.
-	if err := m.Delete(key); err != nil && !errors.Is(err, ebpf.ErrKeyNotExist) && !errors.Is(err, unix.EINVAL) {
-		resp.Diagnostics.AddError("deleting map entry", fmt.Sprintf("map %s: %s", pinPath, err))
+	// Tolerate EINVAL only for those types, so a genuine EINVAL (e.g. a
+	// malformed key on a hash map) still surfaces.
+	err = m.Delete(key)
+	if err != nil && !errors.Is(err, ebpf.ErrKeyNotExist) {
+		if !(errors.Is(err, unix.EINVAL) && isFixedSlotMap(m.Type())) {
+			resp.Diagnostics.AddError("deleting map entry", fmt.Sprintf("map %s: %s", pinPath, err))
+		}
 	}
 }
 
@@ -240,6 +245,18 @@ func (r *mapEntryResource) put(_ context.Context, plan *mapEntryResourceModel, d
 func isPerCPUMap(mt ebpf.MapType) bool {
 	switch mt {
 	case ebpf.PerCPUHash, ebpf.PerCPUArray, ebpf.LRUCPUHash, ebpf.PerCPUCGroupStorage:
+		return true
+	}
+	return false
+}
+
+// isFixedSlotMap reports whether the map has a fixed set of slots that the
+// kernel refuses to delete (it returns EINVAL). Delete tolerates EINVAL only
+// for these types, so a genuine EINVAL on a hash map still surfaces.
+func isFixedSlotMap(mt ebpf.MapType) bool {
+	switch mt {
+	case ebpf.Array, ebpf.PerCPUArray, ebpf.ProgramArray, ebpf.PerfEventArray,
+		ebpf.CGroupArray, ebpf.ArrayOfMaps, ebpf.DevMap, ebpf.CPUMap, ebpf.XSKMap:
 		return true
 	}
 	return false
