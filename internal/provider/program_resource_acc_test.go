@@ -244,7 +244,8 @@ resource "terrahive_ebpf_program" "probe" {
 			},
 			{
 				// Swap the pin out-of-band: refresh must report drift
-				// and the plan must recreate the program.
+				// and the apply must recreate the program, unpinning
+				// the rogue pin first.
 				PreConfig: func() {
 					if err := os.Remove(pinPath); err != nil {
 						t.Fatalf("removing pin: %v", err)
@@ -266,9 +267,19 @@ resource "terrahive_ebpf_program" "probe" {
 						t.Fatalf("pinning swap program: %v", err)
 					}
 				},
-				Config:             config,
-				PlanOnly:           true,
-				ExpectNonEmptyPlan: true,
+				Config: config,
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectResourceAction("terrahive_ebpf_program.probe", plancheck.ResourceActionDestroyBeforeCreate),
+					},
+				},
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestMatchResourceAttr("terrahive_ebpf_program.probe", "tag", regexp.MustCompile(`^[0-9a-f]{16}$`)),
+					func(*terraform.State) error {
+						_, err := os.Stat(pinPath)
+						return err
+					},
+				),
 			},
 		},
 	})

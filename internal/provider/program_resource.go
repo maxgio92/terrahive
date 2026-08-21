@@ -22,6 +22,12 @@ import (
 const goSourceUnsupported = "go_source requires the terrahive-bumble flavor, which embeds the TinyGo toolchain. " +
 	"This is the lean terrahive binary: use object_file or c_source, or switch to the bumble flavor."
 
+// pinDriftKey marks, in private state, that Read found the pin swapped
+// out-of-band. ModifyPlan turns it into a replacement so Delete unpins
+// the rogue pin before Create; dropping the resource from state instead
+// would plan a pure create that fails on the existing pin path.
+const pinDriftKey = "pin_drift"
+
 type programResource struct {
 	hive *hive.Hive
 }
@@ -201,6 +207,17 @@ func (r *programResource) ModifyPlan(ctx context.Context, req resource.ModifyPla
 		resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, path.Root("tag"), types.StringUnknown())...)
 		resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, path.Root("id"), types.StringUnknown())...)
 	}
+
+	drift, diags := req.Private.GetKey(ctx, pinDriftKey)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	if drift != nil {
+		resp.RequiresReplace = append(resp.RequiresReplace, path.Root("tag"))
+		resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, path.Root("tag"), types.StringUnknown())...)
+		resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, path.Root("id"), types.StringUnknown())...)
+	}
 }
 
 func (r *programResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -292,10 +309,16 @@ func (r *programResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 	// A different tag or type means the pin was swapped out-of-band:
-	// drop the resource so the plan recreates it.
-	if (known(state.Tag) && state.Tag.ValueString() != tag) ||
-		(known(state.Type) && state.Type.ValueString() != typ) {
-		resp.State.RemoveResource(ctx)
+	// refresh the observed values and mark the drift in private state so
+	// ModifyPlan forces a replacement that unpins the rogue pin.
+	drifted := (known(state.Tag) && state.Tag.ValueString() != tag) ||
+		(known(state.Type) && state.Type.ValueString() != typ)
+	var driftValue []byte
+	if drifted {
+		driftValue = []byte(`true`)
+	}
+	resp.Diagnostics.Append(resp.Private.SetKey(ctx, pinDriftKey, driftValue)...)
+	if resp.Diagnostics.HasError() {
 		return
 	}
 
