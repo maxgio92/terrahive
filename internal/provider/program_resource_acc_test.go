@@ -203,26 +203,6 @@ resource "ebpf_program" "probe" {
 	})
 }
 
-func TestAccProgramGoSourceRejected(t *testing.T) {
-	pinDir := accPinDir(t)
-
-	resource.Test(t, resource.TestCase{
-		PreCheck:                 func() { accPreCheck(t) },
-		ProtoV6ProviderFactories: accProtoV6Factories,
-		Steps: []resource.TestStep{
-			{
-				Config: accProviderBlock(pinDir) + `
-resource "ebpf_program" "probe" {
-  name      = "gopher"
-  go_source = "package main"
-}
-`,
-				ExpectError: regexp.MustCompile(`terrahive-bumble`),
-			},
-		},
-	})
-}
-
 func TestAccProgramDriftOnPinSwap(t *testing.T) {
 	pinDir := accPinDir(t)
 	objPath := accCompile(t, accKprobeSource)

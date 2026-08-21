@@ -35,10 +35,10 @@
 
 ## 5. Flavors
 
-- [ ] 5.1 Build tags splitting lean and bumble binaries
-- [ ] 5.2 Embed pinned TinyGo toolchain via embed.FS, extract-on-first-use cache
-- [ ] 5.3 `go_source` compile path in bumble; clear error in lean
-- [ ] 5.4 Release both flavors from one pipeline
+- [x] 5.1 Build tags splitting lean and bumble binaries
+- [x] 5.2 Embed pinned TinyGo toolchain via embed.FS, extract-on-first-use cache
+- [x] 5.3 `go_source` compile path in bumble; clear error in lean
+- [x] 5.4 Release both flavors from one pipeline
 
 ## 6. Verification and docs
 

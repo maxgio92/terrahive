@@ -19,9 +19,6 @@ import (
 	"github.com/maxgio92/terrahive/internal/hive"
 )
 
-const goSourceUnsupported = "go_source requires the terrahive-bumble flavor, which embeds the TinyGo toolchain. " +
-	"This is the lean terrahive binary: use object_file or c_source, or switch to the bumble flavor."
-
 // pinDriftKey marks, in private state, that Read found the pin swapped
 // out-of-band. ModifyPlan turns it into a replacement so Delete unpins
 // the rogue pin before Create; dropping the resource from state instead
@@ -147,7 +144,9 @@ func (r *programResource) ValidateConfig(ctx context.Context, req resource.Valid
 		return
 	}
 	if !config.GoSource.IsNull() && !config.GoSource.IsUnknown() {
-		resp.Diagnostics.AddAttributeError(path.Root("go_source"), "go_source not supported in this flavor", goSourceUnsupported)
+		if err := checkGoSourceSupported(); err != nil {
+			resp.Diagnostics.AddAttributeError(path.Root("go_source"), "go_source not supported in this flavor", err.Error())
+		}
 	}
 }
 
@@ -180,6 +179,8 @@ func (r *programResource) ModifyPlan(ctx context.Context, req resource.ModifyPla
 		inferred = hive.ProgramTypeString(spec.Type)
 	case known(plan.CSource):
 		hash = types.StringValue(hive.SourceHash([]byte(plan.CSource.ValueString())))
+	case known(plan.GoSource):
+		hash = types.StringValue(hive.SourceHash([]byte(plan.GoSource.ValueString())))
 	}
 
 	if inferred != "" {
@@ -244,8 +245,13 @@ func (r *programResource) Create(ctx context.Context, req resource.CreateRequest
 			return
 		}
 	default:
-		resp.Diagnostics.AddAttributeError(path.Root("go_source"), "go_source not supported in this flavor", goSourceUnsupported)
-		return
+		// ExactlyOneOf guarantees go_source is the remaining source.
+		var err error
+		obj, err = compileGoSource(plan.GoSource.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddAttributeError(path.Root("go_source"), "compiling go_source failed", err.Error())
+			return
+		}
 	}
 
 	spec, err := hive.LoadELF(obj)
@@ -368,11 +374,14 @@ func (r *programResource) ImportState(ctx context.Context, req resource.ImportSt
 }
 
 // sourceHash fingerprints the effective program source: the object
-// bytes for object_file, the source text for c_source. ModifyPlan
-// computes the same value at plan time.
+// bytes for object_file, the source text for c_source and go_source.
+// ModifyPlan computes the same value at plan time.
 func sourceHash(plan programModel, obj []byte) string {
-	if known(plan.CSource) {
+	switch {
+	case known(plan.CSource):
 		return hive.SourceHash([]byte(plan.CSource.ValueString()))
+	case known(plan.GoSource):
+		return hive.SourceHash([]byte(plan.GoSource.ValueString()))
 	}
 	return hive.SourceHash(obj)
 }

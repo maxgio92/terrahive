@@ -2,7 +2,6 @@ package provider
 
 import (
 	"context"
-	"strings"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -67,7 +66,10 @@ func programConfig(t *testing.T, values map[string]tftypes.Value) tfsdk.Config {
 	return tfsdk.Config{Raw: tftypes.NewValue(objType, full), Schema: s}
 }
 
-func TestProgramResourceValidateConfigRejectsGoSource(t *testing.T) {
+// validateGoSourceConfig runs ValidateConfig on a go_source-only
+// config; the flavor test files assert the flavor-specific outcome.
+func validateGoSourceConfig(t *testing.T) *resource.ValidateConfigResponse {
+	t.Helper()
 	config := programConfig(t, map[string]tftypes.Value{
 		"name":      tftypes.NewValue(tftypes.String, "buzz"),
 		"go_source": tftypes.NewValue(tftypes.String, "package main"),
@@ -75,18 +77,7 @@ func TestProgramResourceValidateConfigRejectsGoSource(t *testing.T) {
 	resp := &resource.ValidateConfigResponse{}
 	r := NewProgramResource().(*programResource)
 	r.ValidateConfig(context.Background(), resource.ValidateConfigRequest{Config: config}, resp)
-	if !resp.Diagnostics.HasError() {
-		t.Fatal("expected go_source diagnostic")
-	}
-	found := false
-	for _, d := range resp.Diagnostics.Errors() {
-		if strings.Contains(d.Detail(), "terrahive-bumble") {
-			found = true
-		}
-	}
-	if !found {
-		t.Fatalf("diagnostic does not point to the bumble flavor: %v", resp.Diagnostics)
-	}
+	return resp
 }
 
 func TestProgramResourceValidateConfigAcceptsObjectFile(t *testing.T) {

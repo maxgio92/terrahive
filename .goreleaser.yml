@@ -15,12 +15,35 @@ builds:
     goarch:
       - amd64
       - arm64
-  # The bumble flavor embeds the TinyGo toolchain (build tag: bumble).
-  # Enabled once task group 5 lands.
+  # The bumble flavor embeds the pinned TinyGo toolchain; the pre-hook
+  # fetches the release into the go:embed tree before compiling.
+  - id: bumble
+    binary: "{{ .ProjectName }}-bumble_v{{ .Version }}"
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    tags:
+      - bumble
+    ldflags:
+      - "-s -w -X main.version={{ .Version }}"
+    goos:
+      - linux
+    goarch:
+      - amd64
+    hooks:
+      pre:
+        - make fetch-tinygo TINYGO_ARCH={{ .Arch }}
 
 archives:
-  - formats: [zip]
+  - id: lean
+    ids: [lean]
+    formats: [zip]
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+  - id: bumble
+    ids: [bumble]
+    formats: [zip]
+    name_template: "{{ .ProjectName }}-bumble_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
 
 checksum:
   extra_files:
