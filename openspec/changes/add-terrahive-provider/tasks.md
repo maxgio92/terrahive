@@ -18,9 +18,9 @@
 
 ## 3. Maps
 
-- [ ] 3.1 `ebpf_map` resource: type, key_size, value_size, max_entries; create, pin, read, delete
-- [ ] 3.2 `ebpf_map_entry` resource: base64 key and value, lookup-based drift detection
-- [ ] 3.3 Map sharing: programs reference pinned maps by path
+- [x] 3.1 `ebpf_map` resource: type, key_size, value_size, max_entries; create, pin, read, delete
+- [x] 3.2 `ebpf_map_entry` resource: base64 key and value, lookup-based drift detection
+- [x] 3.3 Map sharing: programs reference pinned maps by path
 
 ## 4. Attachments
 
