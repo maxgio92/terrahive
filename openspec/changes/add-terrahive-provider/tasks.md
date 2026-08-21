@@ -2,10 +2,10 @@
 
 ## 1. Provider skeleton
 
-- [ ] 1.1 Scaffold the Go module and terraform-plugin-framework provider named `terrahive`
-- [ ] 1.2 Provider configuration: `pin_dir` (default `/sys/fs/bpf/terrahive`), validate bpffs mount and privileges
-- [ ] 1.3 Shared internal package for pin, load, read, and unpin via cilium/ebpf
-- [ ] 1.4 goreleaser config, registry manifest, GPG signing
+- [x] 1.1 Scaffold the Go module and terraform-plugin-framework provider named `terrahive`
+- [x] 1.2 Provider configuration: `pin_dir` (default `/sys/fs/bpf/terrahive`), validate bpffs mount and privileges
+- [x] 1.3 Shared internal package for pin, load, read, and unpin via cilium/ebpf
+- [x] 1.4 goreleaser config, registry manifest, GPG signing
 
 ## 2. Program loading
 
