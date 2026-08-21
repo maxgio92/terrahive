@@ -16,10 +16,12 @@ const Version = "0.38.0"
 
 // The bumble flavor embeds a pinned TinyGo release here. Only
 // toolchain/README.md is checked into git; a release build populates
-// toolchain/tinygo/ first (`make fetch-tinygo`, wired as a goreleaser
+// toolchain/_tinygo/ first (`make fetch-tinygo`, wired as a goreleaser
 // pre-hook), so the go:embed directive picks up the full 150MB tree
-// while dev builds with -tags bumble still compile. go:embed ignores
-// .gitignore, so the fetched tree is embedded without being committed.
+// while dev builds with -tags bumble still compile. The dir is
+// underscore-prefixed so the go tool skips it during build and test
+// (it holds TinyGo's own source tree); the all: prefix still embeds it.
+// The embed directive ignores .gitignore, so the tree ships uncommitted.
 //
 //go:embed all:toolchain
 var embedded embed.FS
@@ -29,7 +31,7 @@ var embedded embed.FS
 // with build instructions when the binary was built without a fetched
 // release (a dev build).
 func Embedded() (*Toolchain, error) {
-	sub, err := fs.Sub(embedded, "toolchain/tinygo")
+	sub, err := fs.Sub(embedded, "toolchain/_tinygo")
 	if err != nil {
 		return nil, fmt.Errorf("resolving embedded toolchain: %w", err)
 	}
