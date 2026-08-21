@@ -1,0 +1,39 @@
+---
+page_title: "ebpf_xdp Resource - terrahive"
+description: |-
+  Attaches an XDP program to a network interface through a pinned bpf_link.
+---
+
+# ebpf_xdp (Resource)
+
+Attaches an XDP program to a network interface through a pinned `bpf_link`. Any
+attribute change forces replacement.
+
+## Example Usage
+
+```terraform
+resource "ebpf_xdp" "lo" {
+  name      = "xdp-drop-lo"
+  program   = ebpf_program.drop.id
+  interface = "lo"
+  mode      = "generic"
+}
+```
+
+## Schema
+
+### Required
+
+- `name` (String) Pin name of the link under the pin directory. Forces replacement.
+- `program` (String) bpffs pin path of the program to attach. Forces replacement.
+- `interface` (String) Network interface name to attach to. Forces replacement.
+
+### Optional
+
+- `mode` (String) XDP attach mode: generic, driver, or offload. Unset lets the kernel pick. Forces replacement.
+
+### Read-Only
+
+- `id` (String) bpffs pin path of the link.
+- `link_id` (Number) Kernel ID of the bpf_link.
+- `program_id` (Number) Kernel ID of the attached program.

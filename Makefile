@@ -5,7 +5,7 @@ TINYGO_ARCH ?= amd64
 TINYGO_URL = https://github.com/tinygo-org/tinygo/releases/download/v$(TINYGO_VERSION)/tinygo$(TINYGO_VERSION).linux-$(TINYGO_ARCH).tar.gz
 TOOLCHAIN_DIR = internal/hive/tinygo/toolchain
 
-.PHONY: build build-bumble fetch-tinygo test testacc lint
+.PHONY: build build-bumble fetch-tinygo test testacc lint docs
 
 build:
 	go build ./...
@@ -33,3 +33,10 @@ testacc:
 lint:
 	golangci-lint run
 	golangci-lint run --build-tags bumble
+
+# Regenerates docs/ from the provider schema with tfplugindocs.
+# Needs network access to fetch the generator on first run. The
+# committed docs/resources/*.md pages are the source of truth until
+# this runs.
+docs:
+	go generate ./tools

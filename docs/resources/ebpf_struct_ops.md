@@ -1,0 +1,33 @@
+---
+page_title: "ebpf_struct_ops Resource - terrahive"
+description: |-
+  Registers a struct_ops map with the kernel through a pinned bpf_link.
+---
+
+# ebpf_struct_ops (Resource)
+
+Registers a struct_ops map with the kernel through a pinned `bpf_link`. Point it
+at a pinned struct_ops map, for example a TCP congestion control map. Any
+attribute change forces replacement.
+
+## Example Usage
+
+```terraform
+resource "ebpf_struct_ops" "cc" {
+  name = "my-congestion-control"
+  map  = ebpf_map.cc_ops.id
+}
+```
+
+## Schema
+
+### Required
+
+- `name` (String) Pin name of the link under the pin directory. Forces replacement.
+- `map` (String) bpffs pin path of the struct_ops map to register. Forces replacement.
+
+### Read-Only
+
+- `id` (String) bpffs pin path of the link.
+- `link_id` (Number) Kernel ID of the bpf_link.
+- `program_id` (Number) Kernel ID of the attached program.
