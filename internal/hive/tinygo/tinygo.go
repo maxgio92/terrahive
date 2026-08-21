@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sync"
 )
 
 // binaryRelPath is where the tinygo binary lives inside a release tree.
@@ -33,12 +34,26 @@ func New(fsys fs.FS, cacheDir string) *Toolchain {
 	return &Toolchain{fsys: fsys, cacheDir: cacheDir}
 }
 
+// extractMu serializes cache extraction across Toolchains in this
+// process: Terraform runs resource Creates concurrently and each one
+// builds its own Toolchain, so without it two Extracts could remove
+// each other's just-renamed cache. Cross-process safety stays
+// best-effort via the temp-dir-plus-rename dance.
+var extractMu sync.Mutex
+
 // Extract unpacks the toolchain into the cache directory unless a
 // previous run already did, and returns the tinygo binary path.
 // Extraction goes through a temp directory renamed into place, so a
 // crashed run never leaves a half-populated cache behind.
 func (t *Toolchain) Extract() (string, error) {
 	bin := filepath.Join(t.cacheDir, filepath.FromSlash(binaryRelPath))
+	if _, err := os.Stat(filepath.Join(t.cacheDir, extractedMarker)); err == nil {
+		return bin, nil
+	}
+
+	extractMu.Lock()
+	defer extractMu.Unlock()
+	// Another goroutine may have finished extraction while we waited.
 	if _, err := os.Stat(filepath.Join(t.cacheDir, extractedMarker)); err == nil {
 		return bin, nil
 	}

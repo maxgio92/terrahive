@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"testing/fstest"
 )
@@ -62,6 +63,36 @@ func TestExtractIsIdempotent(t *testing.T) {
 	}
 	if string(data) != "sentinel" {
 		t.Fatal("second Extract re-extracted over a complete cache")
+	}
+}
+
+// TestExtractConcurrent mirrors Terraform running parallel Creates:
+// each goroutine gets its own Toolchain for the same cold cache, and
+// every Extract must succeed and leave a usable binary behind.
+func TestExtractConcurrent(t *testing.T) {
+	cache := filepath.Join(t.TempDir(), "cache")
+	fsys := fakeToolchainFS("v1")
+
+	const n = 10
+	bins := make([]string, n)
+	errs := make([]error, n)
+	var wg sync.WaitGroup
+	for i := range n {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			bins[i], errs[i] = New(fsys, cache).Extract()
+		}()
+	}
+	wg.Wait()
+
+	for i := range n {
+		if errs[i] != nil {
+			t.Fatalf("Extract %d: %v", i, errs[i])
+		}
+		if _, err := os.Stat(bins[i]); err != nil {
+			t.Fatalf("stat binary from Extract %d: %v", i, err)
+		}
 	}
 }
 
