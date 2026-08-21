@@ -17,11 +17,12 @@ provider "ebpf" {}
 resource "ebpf_program" "counter" {
   name = "go_counter"
 
+  # The body below is illustrative, not a working TinyGo BPF program.
+  # A real probe declares its section and helpers the way TinyGo's BPF
+  # target expects; the point here is the resource shape, not the source.
   go_source = <<-EOT
     package main
 
-    //go:generate echo build with the bumble flavor
-    //export do_sys_openat2
     func probe() int {
       return 0
     }

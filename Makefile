@@ -34,9 +34,7 @@ lint:
 	golangci-lint run
 	golangci-lint run --build-tags bumble
 
-# Regenerates docs/ from the provider schema with tfplugindocs.
-# Needs network access to fetch the generator on first run. The
-# committed docs/resources/*.md pages are the source of truth until
-# this runs.
-docs:
-	go generate ./tools
+# The docs/resources/*.md pages are hand-maintained. The resource prefix
+# (ebpf_) differs from the provider name (terrahive), and the pages carry
+# curated prose and examples, so tfplugindocs generation is not wired up:
+# it would overwrite the curated content with bare schema dumps.

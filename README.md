@@ -54,7 +54,8 @@ terraform {
 }
 ```
 
-Pick the flavor by version constraint or by building from source:
+The two flavors are separate build artifacts, not one release chosen by a
+version constraint. Build the one you want from source:
 
 ```shell
 # Lean flavor.
