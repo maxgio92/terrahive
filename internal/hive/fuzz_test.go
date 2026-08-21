@@ -10,13 +10,13 @@ import (
 // object files reach this path, so a malformed ELF must return an error,
 // never panic. The seed is a real single-program kprobe object.
 func FuzzLoadELF(f *testing.F) {
-	obj, err := CompileC(kprobeSource)
-	if err != nil {
-		f.Skipf("clang not available to build the seed object: %v", err)
-	}
-	f.Add(obj)
+	// Seed the malformed-input cases first, so LoadELF still gets fuzzed
+	// on runners without clang (the compiled seed just adds one more case).
 	f.Add([]byte("not an ELF"))
 	f.Add([]byte{})
+	if obj, err := CompileC(kprobeSource); err == nil {
+		f.Add(obj)
+	}
 
 	f.Fuzz(func(t *testing.T, data []byte) {
 		spec, err := LoadELF(data)
@@ -39,10 +39,9 @@ func FuzzScanStapsdtNotes(f *testing.F) {
 	f.Add(make([]byte, 12))
 
 	f.Fuzz(func(t *testing.T, data []byte) {
+		// Panic-only target: a malformed note must error, not crash.
 		for _, bo := range []binary.ByteOrder{binary.LittleEndian, binary.BigEndian} {
-			if _, err := scanStapsdtNotes(data, bo); err != nil {
-				continue
-			}
+			_, _ = scanStapsdtNotes(data, bo)
 		}
 	})
 }
