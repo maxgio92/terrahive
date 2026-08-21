@@ -5,7 +5,6 @@
 package tinygo
 
 import (
-	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -119,7 +118,7 @@ func CompileWith(bin, source string, extraEnv ...string) ([]byte, error) {
 	}
 	obj, err := os.ReadFile(objPath)
 	if err != nil {
-		return nil, errors.New("tinygo reported success but produced no object file")
+		return nil, fmt.Errorf("tinygo reported success but produced no object file: %w", err)
 	}
 	return obj, nil
 }

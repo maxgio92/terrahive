@@ -20,8 +20,8 @@ type USDT struct {
 
 // ResolveUSDT parses the .note.stapsdt section of the executable at
 // path and returns the location of the probe identified by provider
-// and name. cilium/ebpf has no USDT support, so terrahive resolves the
-// note itself and attaches a plain uprobe at the resulting offset.
+// and name. terrahive resolves the note itself and attaches a plain
+// uprobe at the resulting offset.
 func ResolveUSDT(path, provider, name string) (*USDT, error) {
 	f, err := elf.Open(path)
 	if err != nil {

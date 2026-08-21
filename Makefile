@@ -18,7 +18,8 @@ build-bumble: fetch-tinygo
 # ($(TOOLCHAIN_DIR)/tinygo, git-ignored). goreleaser runs this as a
 # pre-hook of the bumble build.
 fetch-tinygo:
-	@if [ ! -x $(TOOLCHAIN_DIR)/tinygo/bin/tinygo ]; then \
+	@if ! $(TOOLCHAIN_DIR)/tinygo/bin/tinygo version 2>/dev/null | grep -q "version $(TINYGO_VERSION) linux/$(TINYGO_ARCH)"; then \
+		rm -rf $(TOOLCHAIN_DIR)/tinygo; \
 		curl -fsSL $(TINYGO_URL) | tar -xz -C $(TOOLCHAIN_DIR); \
 	fi
 
