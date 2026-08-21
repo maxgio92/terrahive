@@ -1,0 +1,17 @@
+---
+page_title: "ebpf_struct_ops Resource - terrahive"
+description: |-
+  Registers a struct_ops map with the kernel through a pinned bpf_link.
+---
+
+# ebpf_struct_ops (Resource)
+
+Registers a struct_ops map with the kernel through a pinned `bpf_link`. Point it
+at a pinned struct_ops map, for example a TCP congestion control map. Any
+attribute change forces replacement.
+
+## Example Usage
+
+{{ tffile "examples/resources/ebpf_struct_ops/resource.tf" }}
+
+{{ .SchemaMarkdown | trimspace }}

@@ -1,0 +1,16 @@
+---
+page_title: "ebpf_cgroup Resource - terrahive"
+description: |-
+  Attaches a program to a cgroup through a pinned bpf_link.
+---
+
+# ebpf_cgroup (Resource)
+
+Attaches a program to a cgroup through a pinned `bpf_link`. Any attribute change
+forces replacement.
+
+## Example Usage
+
+{{ tffile "examples/resources/ebpf_cgroup/resource.tf" }}
+
+{{ .SchemaMarkdown | trimspace }}

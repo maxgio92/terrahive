@@ -1,0 +1,16 @@
+---
+page_title: "ebpf_netfilter Resource - terrahive"
+description: |-
+  Attaches a netfilter program to a hook through a pinned bpf_link.
+---
+
+# ebpf_netfilter (Resource)
+
+Attaches a netfilter program to a hook through a pinned `bpf_link`. Requires
+kernel 6.4. Any attribute change forces replacement.
+
+## Example Usage
+
+{{ tffile "examples/resources/ebpf_netfilter/resource.tf" }}
+
+{{ .SchemaMarkdown | trimspace }}

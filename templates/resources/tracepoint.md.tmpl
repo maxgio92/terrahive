@@ -1,0 +1,16 @@
+---
+page_title: "ebpf_tracepoint Resource - terrahive"
+description: |-
+  Attaches a program to a tracepoint, raw tracepoint, or perf event.
+---
+
+# ebpf_tracepoint (Resource)
+
+Attaches a program to a tracepoint, raw tracepoint, or perf event through a
+pinned `bpf_link`. Any attribute change forces replacement.
+
+## Example Usage
+
+{{ tffile "examples/resources/ebpf_tracepoint/resource.tf" }}
+
+{{ .SchemaMarkdown | trimspace }}

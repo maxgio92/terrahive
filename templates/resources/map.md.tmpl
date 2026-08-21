@@ -1,0 +1,22 @@
+---
+page_title: "ebpf_map Resource - terrahive"
+description: |-
+  Creates a BPF map in the kernel and pins it under the provider pin directory.
+---
+
+# ebpf_map (Resource)
+
+Creates a BPF map in the kernel and pins it under the provider `pin_dir`. The
+pin path is the resource ID. Map dimensions are immutable in the kernel, so any
+shape change forces replacement. Reference the pinned map from programs or from
+`ebpf_map_entry` so several programs share one map.
+
+## Example Usage
+
+{{ tffile "examples/resources/ebpf_map/resource.tf" }}
+
+{{ .SchemaMarkdown | trimspace }}
+
+## Import
+
+{{ codefile "shell" "examples/resources/ebpf_map/import.sh" }}

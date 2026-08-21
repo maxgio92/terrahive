@@ -1,0 +1,18 @@
+---
+page_title: "ebpf_tracing Resource - terrahive"
+description: |-
+  Attaches a BTF-powered tracing program through a pinned bpf_link.
+---
+
+# ebpf_tracing (Resource)
+
+Attaches a BTF-powered tracing program (fentry, fexit, fmod_ret, lsm, iter)
+through a pinned `bpf_link`. The attach target is fixed at program load time, so
+the program itself names the function it hooks. Any attribute change forces
+replacement.
+
+## Example Usage
+
+{{ tffile "examples/resources/ebpf_tracing/resource.tf" }}
+
+{{ .SchemaMarkdown | trimspace }}

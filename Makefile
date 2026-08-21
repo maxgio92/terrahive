@@ -34,7 +34,18 @@ lint:
 	golangci-lint run
 	golangci-lint run --build-tags bumble
 
-# The docs/resources/*.md pages are hand-maintained. The resource prefix
-# (ebpf_) differs from the provider name (terrahive), and the pages carry
-# curated prose and examples, so tfplugindocs generation is not wired up:
-# it would overwrite the curated content with bare schema dumps.
+# Generates docs/ from templates/ and examples/ with tfplugindocs. The
+# templates carry the curated prose and inject the schema and examples, so
+# generation keeps the prose instead of dumping bare schema. The resource
+# prefix (ebpf_) differs from the provider name (terrahive), so generation
+# runs with --provider-name ebpf for schema lookup (see tools/tools.go) and
+# the templates drop the prefix; the rename restores ebpf_ on the pages.
+docs:
+	go generate ./tools
+	@for f in docs/resources/*.md; do \
+		base=$$(basename $$f); \
+		case $$base in \
+		ebpf_*) ;; \
+		*) mv "$$f" "docs/resources/ebpf_$$base" ;; \
+		esac; \
+	done

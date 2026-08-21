@@ -1,0 +1,16 @@
+---
+page_title: "ebpf_tcx Resource - terrahive"
+description: |-
+  Attaches a tc program to a network interface via tcx through a pinned bpf_link.
+---
+
+# ebpf_tcx (Resource)
+
+Attaches a tc program to a network interface via tcx through a pinned
+`bpf_link`. Requires kernel 6.6. Any attribute change forces replacement.
+
+## Example Usage
+
+{{ tffile "examples/resources/ebpf_tcx/resource.tf" }}
+
+{{ .SchemaMarkdown | trimspace }}

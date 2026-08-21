@@ -1,0 +1,28 @@
+---
+page_title: "ebpf_program Resource - terrahive"
+description: |-
+  Loads a BPF program into the kernel and pins it under the provider pin directory.
+---
+
+# ebpf_program (Resource)
+
+Loads a BPF program into the kernel and pins it under the provider pin
+directory. Give exactly one source: `object_file`, `c_source`, or `go_source`.
+The program type is inferred from the ELF section name. `type` acts as an
+assertion against the inferred type.
+
+A loaded program is immutable in the kernel, so any change to a source or the
+type forces replacement. Attachments reference programs by pin path, so a
+replacement cascades to dependent attachments.
+
+## Example Usage
+
+{{ tffile "examples/resources/ebpf_program/resource.tf" }}
+
+{{ .SchemaMarkdown | trimspace }}
+
+## Import
+
+Import a program by its pin path:
+
+{{ codefile "shell" "examples/resources/ebpf_program/import.sh" }}

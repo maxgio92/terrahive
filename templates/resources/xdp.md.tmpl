@@ -1,0 +1,16 @@
+---
+page_title: "ebpf_xdp Resource - terrahive"
+description: |-
+  Attaches an XDP program to a network interface through a pinned bpf_link.
+---
+
+# ebpf_xdp (Resource)
+
+Attaches an XDP program to a network interface through a pinned `bpf_link`. Any
+attribute change forces replacement.
+
+## Example Usage
+
+{{ tffile "examples/resources/ebpf_xdp/resource.tf" }}
+
+{{ .SchemaMarkdown | trimspace }}

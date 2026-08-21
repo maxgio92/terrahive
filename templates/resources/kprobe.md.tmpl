@@ -1,0 +1,17 @@
+---
+page_title: "ebpf_kprobe Resource - terrahive"
+description: |-
+  Attaches a program to a kernel or user probe through a pinned bpf_link.
+---
+
+# ebpf_kprobe (Resource)
+
+Attaches a program to a kernel or user probe through a pinned `bpf_link`. The
+link survives Terraform exiting because it is pinned. Destroy the resource to
+detach without unloading the program. Any attribute change forces replacement.
+
+## Example Usage
+
+{{ tffile "examples/resources/ebpf_kprobe/resource.tf" }}
+
+{{ .SchemaMarkdown | trimspace }}
