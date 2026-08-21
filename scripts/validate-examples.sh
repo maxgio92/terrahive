@@ -58,12 +58,13 @@ status=0
 for module in examples/*/; do
 	module="${module%/}"
 	# Only root modules that bind the provider to our source address.
-	if ! grep -rqs "$PROVIDER_SOURCE" "$module"/*.tf; then
+	if ! grep -qsF "$PROVIDER_SOURCE" "$module"/*.tf; then
 		continue
 	fi
 
 	override_dir="$LEAN_DIR"
-	if grep -rqs "go_source" "$module"/*.tf; then
+	# Match a go_source attribute assignment, not the word in a comment.
+	if grep -Eqs '^[[:space:]]*go_source[[:space:]]*=' "$module"/*.tf; then
 		build_bumble
 		override_dir="$BUMBLE_DIR"
 	fi

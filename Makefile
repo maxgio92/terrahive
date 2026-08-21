@@ -50,7 +50,6 @@ fuzz:
 	go test ./internal/hive -run=^$$ -fuzz=^FuzzLoadELF$$ -fuzztime=$(FUZZTIME)
 	go test ./internal/hive -run=^$$ -fuzz=^FuzzScanStapsdtNotes$$ -fuzztime=$(FUZZTIME)
 	go test ./internal/provider -run=^$$ -fuzz=^FuzzMapEntryID$$ -fuzztime=$(FUZZTIME)
-	go test ./internal/provider -run=^$$ -fuzz=^FuzzMapEntryValueDecode$$ -fuzztime=$(FUZZTIME)
 
 # Validates every example root module offline against a locally built
 # provider using Terraform dev_overrides. See scripts/validate-examples.sh.

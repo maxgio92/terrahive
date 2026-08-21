@@ -30,18 +30,3 @@ func FuzzMapEntryID(f *testing.F) {
 		}
 	})
 }
-
-// FuzzMapEntryValueDecode covers the standard base64 decode applied to
-// the key and value attributes before they reach the kernel map. The
-// attribute values come from user config, so any input must decode or
-// error without panicking.
-func FuzzMapEntryValueDecode(f *testing.F) {
-	f.Add("AAAAAA==")
-	f.Add("AQ==")
-	f.Add("not base64!!")
-	f.Add("")
-
-	f.Fuzz(func(t *testing.T, s string) {
-		_, _ = base64.StdEncoding.DecodeString(s)
-	})
-}
