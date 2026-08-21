@@ -9,12 +9,12 @@
 
 ## 2. Program loading
 
-- [ ] 2.1 `ebpf_program` schema with `object_file`, `c_source`, `go_source` and `ExactlyOneOf` validation
-- [ ] 2.2 Load from object file: parse ELF, infer type from section, load, pin
-- [ ] 2.3 Read: resolve pin, compare program tag and type for drift
-- [ ] 2.4 Delete and import
-- [ ] 2.5 `c_source` path: compile with system clang at apply
-- [ ] 2.6 Force replacement on any source or type change
+- [x] 2.1 `ebpf_program` schema with `object_file`, `c_source`, `go_source` and `ExactlyOneOf` validation
+- [x] 2.2 Load from object file: parse ELF, infer type from section, load, pin
+- [x] 2.3 Read: resolve pin, compare program tag and type for drift
+- [x] 2.4 Delete and import
+- [x] 2.5 `c_source` path: compile with system clang at apply
+- [x] 2.6 Force replacement on any source or type change
 
 ## 3. Maps
 
