@@ -16,6 +16,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"golang.org/x/sys/unix"
 
 	"github.com/maxgio92/terrahive/internal/hive"
 )
@@ -189,7 +190,10 @@ func (r *mapEntryResource) Delete(ctx context.Context, req resource.DeleteReques
 	}
 	defer func() { _ = m.Close() }()
 
-	if err := m.Delete(key); err != nil && !errors.Is(err, ebpf.ErrKeyNotExist) {
+	// Array-family maps have a fixed set of slots that cannot be deleted;
+	// the kernel returns EINVAL. Destroy still succeeds: the slot keeps
+	// its zero value, and the pin is torn down with the ebpf_map resource.
+	if err := m.Delete(key); err != nil && !errors.Is(err, ebpf.ErrKeyNotExist) && !errors.Is(err, unix.EINVAL) {
 		resp.Diagnostics.AddError("deleting map entry", fmt.Sprintf("map %s: %s", pinPath, err))
 	}
 }
@@ -219,9 +223,26 @@ func (r *mapEntryResource) put(_ context.Context, plan *mapEntryResourceModel, d
 	}
 	defer func() { _ = m.Close() }()
 
+	if isPerCPUMap(m.Type()) {
+		diags.AddError("per-CPU map not supported",
+			fmt.Sprintf("map %s is a per-CPU map (%s); ebpf_map_entry manages a single flat value and cannot represent one value per CPU", pinPath, mapTypeString(m.Type())))
+		return
+	}
+
 	if err := m.Put(key, value); err != nil {
 		diags.AddError("writing map entry", fmt.Sprintf("map %s: %s", pinPath, err))
 	}
+}
+
+// isPerCPUMap reports whether the map stores one value per CPU. Such maps
+// return ncpus*value_size from LookupBytes and reject a flat Put, so
+// ebpf_map_entry, which models a single value, cannot manage them.
+func isPerCPUMap(mt ebpf.MapType) bool {
+	switch mt {
+	case ebpf.PerCPUHash, ebpf.PerCPUArray, ebpf.LRUCPUHash, ebpf.PerCPUCGroupStorage:
+		return true
+	}
+	return false
 }
 
 func mapEntryID(pinPath, keyB64 string) string {

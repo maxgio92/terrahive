@@ -25,6 +25,14 @@ import (
 
 var pinNameRe = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._-]*$`)
 
+// pinNameValidators rejects names that are empty or contain path
+// separators, so a resource name cannot escape or nest its pin
+// directory. Shared by every resource whose name becomes a pin path
+// element.
+func pinNameValidators() []validator.String {
+	return []validator.String{stringvalidator.RegexMatches(pinNameRe, "must be a valid bpffs pin name: non-empty, no '/' or leading '.'")}
+}
+
 // attachmentResource implements the CRUD shared by every link-family
 // resource. A kernel bpf_link is immutable, so every attribute forces
 // replacement: Create attaches and pins, Read detects drift through the
@@ -56,7 +64,7 @@ func (r *attachmentResource) Schema(_ context.Context, _ resource.SchemaRequest,
 		"name": schema.StringAttribute{
 			Required:      true,
 			Description:   "Pin name of the link under the hive pin directory.",
-			Validators:    []validator.String{stringvalidator.RegexMatches(pinNameRe, "must be a valid bpffs pin name")},
+			Validators:    pinNameValidators(),
 			PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 		},
 		"id": schema.StringAttribute{
@@ -166,7 +174,6 @@ func (r *attachmentResource) Read(ctx context.Context, req resource.ReadRequest,
 			return
 		}
 	}
-	resp.State.Raw = req.State.Raw
 }
 
 // Update only satisfies the interface: every attribute forces replacement.

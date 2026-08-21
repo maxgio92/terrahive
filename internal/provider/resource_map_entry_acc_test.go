@@ -3,6 +3,7 @@ package provider
 import (
 	"bytes"
 	"fmt"
+	"regexp"
 	"testing"
 
 	"github.com/cilium/ebpf"
@@ -104,6 +105,82 @@ func TestAccMapEntry_disappears(t *testing.T) {
 					return m.Delete(testAccEntryKey)
 				},
 				ExpectNonEmptyPlan: true,
+			},
+		},
+	})
+}
+
+// TestAccMapEntry_arrayDestroy proves destroy tolerates the EINVAL that
+// array-family maps return from delete: an entry on an array map applies
+// and the framework's teardown succeeds instead of wedging.
+func TestAccMapEntry_arrayDestroy(t *testing.T) {
+	pinDir := testAccPinDir(t)
+	pinPath := pinDir + "/map/arr"
+	key := []byte{0, 0, 0, 0}
+	value := []byte{7, 0, 0, 0, 0, 0, 0, 0}
+
+	config := fmt.Sprintf(`
+provider "ebpf" {
+  pin_dir = %q
+}
+
+resource "ebpf_map" "arr" {
+  name        = "arr"
+  type        = "array"
+  key_size    = 4
+  value_size  = 8
+  max_entries = 4
+}
+
+resource "ebpf_map_entry" "test" {
+  map   = ebpf_map.arr.id
+  key   = %q
+  value = %q
+}
+`, pinDir, b64(key), b64(value))
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+				Check:  testAccCheckEntryValue(pinPath, key, value),
+			},
+		},
+	})
+}
+
+// TestAccMapEntry_perCPURejected proves ebpf_map_entry refuses per-CPU
+// maps at create instead of silently mishandling per-CPU values.
+func TestAccMapEntry_perCPURejected(t *testing.T) {
+	pinDir := testAccPinDir(t)
+
+	config := fmt.Sprintf(`
+provider "ebpf" {
+  pin_dir = %q
+}
+
+resource "ebpf_map" "pc" {
+  name        = "pc"
+  type        = "percpu_hash"
+  key_size    = 4
+  value_size  = 8
+  max_entries = 4
+}
+
+resource "ebpf_map_entry" "test" {
+  map   = ebpf_map.pc.id
+  key   = %q
+  value = %q
+}
+`, pinDir, b64([]byte{1, 0, 0, 0}), b64([]byte{2, 0, 0, 0, 0, 0, 0, 0}))
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      config,
+				ExpectError: regexp.MustCompile(`per-CPU map not supported`),
 			},
 		},
 	})

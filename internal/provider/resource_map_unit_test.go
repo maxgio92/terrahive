@@ -1,9 +1,12 @@
 package provider
 
 import (
+	"context"
 	"testing"
 
 	"github.com/cilium/ebpf"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
 func TestParseMapType(t *testing.T) {
@@ -53,6 +56,53 @@ func TestParseMapTypeRoundTrip(t *testing.T) {
 		// distinct kernel types whose names collide case-insensitively.
 		if mapTypeString(got) != mapTypeString(mt) {
 			t.Errorf("round trip %v = %v", mt, got)
+		}
+	}
+}
+
+// TestParseMapTypeExactMatchWins covers the CGroupStorage/CgroupStorage
+// pair whose names collide once case and underscores are normalized: an
+// exact stringer-name match must reach each distinct kernel type.
+func TestParseMapTypeExactMatch(t *testing.T) {
+	tests := []struct {
+		in   string
+		want ebpf.MapType
+	}{
+		{"CGroupStorage", ebpf.CGroupStorage},
+		{"CgroupStorage", ebpf.CgroupStorage},
+	}
+	for _, tt := range tests {
+		got, err := parseMapType(tt.in)
+		if err != nil {
+			t.Errorf("parseMapType(%q): %v", tt.in, err)
+			continue
+		}
+		if got != tt.want {
+			t.Errorf("parseMapType(%q) = %v (%d), want %v (%d)", tt.in, got, got, tt.want, tt.want)
+		}
+	}
+}
+
+func TestPinNameValidator(t *testing.T) {
+	valid := []string{"counters", "my_map", "map.v1", "a-b", "A0"}
+	invalid := []string{"", "..", "../evil", "a/b", "sub/dir", ".hidden", "/abs"}
+	run := func(name string) bool {
+		var resp validator.StringResponse
+		for _, v := range pinNameValidators() {
+			v.ValidateString(context.Background(), validator.StringRequest{
+				ConfigValue: types.StringValue(name),
+			}, &resp)
+		}
+		return !resp.Diagnostics.HasError()
+	}
+	for _, name := range valid {
+		if !run(name) {
+			t.Errorf("pin name %q rejected, want accepted", name)
+		}
+	}
+	for _, name := range invalid {
+		if run(name) {
+			t.Errorf("pin name %q accepted, want rejected", name)
 		}
 	}
 }

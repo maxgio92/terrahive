@@ -64,6 +64,7 @@ func (r *mapResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"name": schema.StringAttribute{
 				Required:    true,
 				Description: "Name of the map; the last element of the pin path.",
+				Validators:  pinNameValidators(),
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
@@ -209,15 +210,28 @@ func (r *mapResource) ImportState(ctx context.Context, req resource.ImportStateR
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
-// parseMapType maps a user-facing type name onto ebpf.MapType. It accepts
-// the cilium/ebpf stringer names case-insensitively, with underscores
-// ignored, so "hash", "lru_hash", and "LRUHash" all resolve.
+// parseMapType maps a user-facing type name onto ebpf.MapType. An exact
+// stringer-name match wins so CGroupStorage and CgroupStorage, which
+// collide once underscores and case are normalized, are both reachable.
+// Otherwise it matches the stringer name case-insensitively with
+// underscores ignored, so "hash", "lru_hash", and "LRUHash" all resolve.
+// The loop stops at the first value the stringer cannot name, so a
+// cilium/ebpf bump that adds map types is picked up without edits here.
 func parseMapType(s string) (ebpf.MapType, error) {
 	want := strings.ToLower(strings.ReplaceAll(s, "_", ""))
-	for mt := ebpf.Hash; mt <= ebpf.Arena; mt++ {
-		if strings.ToLower(mt.String()) == want {
+	normalized := ebpf.UnspecifiedMap
+	found := false
+	for mt := ebpf.Hash; !strings.HasPrefix(mt.String(), "MapType("); mt++ {
+		name := mt.String()
+		if name == s {
 			return mt, nil
 		}
+		if !found && strings.ToLower(name) == want {
+			normalized, found = mt, true
+		}
+	}
+	if found {
+		return normalized, nil
 	}
 	return ebpf.UnspecifiedMap, fmt.Errorf("unknown map type %q", s)
 }

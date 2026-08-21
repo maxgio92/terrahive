@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/cilium/ebpf"
@@ -56,9 +57,17 @@ func TestAttachmentAttributesRequireReplace(t *testing.T) {
 			var replaces bool
 			switch a := attr.(type) {
 			case schema.StringAttribute:
-				replaces = len(a.PlanModifiers) > 0
+				for _, m := range a.PlanModifiers {
+					if strings.Contains(m.Description(context.Background()), "destroy and recreate the resource") {
+						replaces = true
+					}
+				}
 			case schema.Int64Attribute:
-				replaces = len(a.PlanModifiers) > 0
+				for _, m := range a.PlanModifiers {
+					if strings.Contains(m.Description(context.Background()), "destroy and recreate the resource") {
+						replaces = true
+					}
+				}
 			default:
 				t.Fatalf("%s.%s: unexpected attribute type %T", name, attrName, attr)
 			}
