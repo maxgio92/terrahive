@@ -2,7 +2,7 @@ terraform-provider-terrahive
 terraform-provider-terrahive-bumble
 dist/
 # Fetched TinyGo release for the bumble go:embed tree (make fetch-tinygo).
-internal/hive/tinygo/toolchain/tinygo/
+internal/hive/tinygo/toolchain/_tinygo/
 *.bpf.o
 .terraform/
 *.tfstate*

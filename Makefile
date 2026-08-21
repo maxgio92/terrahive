@@ -15,12 +15,15 @@ build-bumble: fetch-tinygo
 	go build -tags bumble -o terraform-provider-terrahive-bumble .
 
 # Downloads the pinned TinyGo release into the go:embed tree
-# ($(TOOLCHAIN_DIR)/tinygo, git-ignored). goreleaser runs this as a
-# pre-hook of the bumble build.
+# ($(TOOLCHAIN_DIR)/_tinygo, git-ignored). The dir is underscore-prefixed
+# so `go build`/`go test ./...` skip TinyGo's own source tree; go:embed
+# all: still bundles it. goreleaser runs this as a pre-hook of the
+# bumble build.
 fetch-tinygo:
-	@if ! $(TOOLCHAIN_DIR)/tinygo/bin/tinygo version 2>/dev/null | grep -q "version $(TINYGO_VERSION) linux/$(TINYGO_ARCH)"; then \
-		rm -rf $(TOOLCHAIN_DIR)/tinygo; \
-		curl -fsSL $(TINYGO_URL) | tar -xz -C $(TOOLCHAIN_DIR); \
+	@if ! $(TOOLCHAIN_DIR)/_tinygo/bin/tinygo version 2>/dev/null | grep -q "version $(TINYGO_VERSION) linux/$(TINYGO_ARCH)"; then \
+		rm -rf $(TOOLCHAIN_DIR)/_tinygo; \
+		mkdir -p $(TOOLCHAIN_DIR)/_tinygo; \
+		curl -fsSL $(TINYGO_URL) | tar -xz --strip-components=1 -C $(TOOLCHAIN_DIR)/_tinygo; \
 	fi
 
 test:
