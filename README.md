@@ -1,15 +1,36 @@
 # terrahive
 
-Terrahive is a Terraform provider that keeps eBPF objects. It loads BPF
-programs, creates maps, writes map entries, and attaches programs to kernel
-hooks, all through `terraform apply`. It is a meme project built to be
-technically sound.
+Write eBPF probes as Terraform code. Run `terraform apply`. They load into the
+running Linux kernel.
 
-The name is the frame. A hive holds bees, and eBPF is the swarm: many small
-programs living in one kernel, each doing one job. Terrahive is the beekeeper.
-It puts the bees in the hive, tells them where to work, and pulls them out when
-you are done. bpffs is the honeycomb: every program, map, and link is pinned to
-a cell so it stays put after the keeper walks away.
+Terrahive is a Terraform provider that treats the kernel as infrastructure.
+You declare a BPF program, a map, or a probe as an HCL resource. `apply` loads
+and attaches it. `plan` reads the kernel back and shows real drift. `destroy`
+unloads it. The workflow you already use for cloud servers, pointed at the
+machine's own kernel instead of a remote API.
+
+```hcl
+resource "ebpf_program" "trace_open" {
+  object_file = "trace_open.bpf.o"
+}
+
+resource "ebpf_kprobe" "trace_open" {
+  program = ebpf_program.trace_open.id
+  symbol  = "do_sys_openat2"
+}
+```
+
+That is it. `apply` loads the program, attaches the kprobe, and pins both so
+they survive after Terraform exits. `destroy` detaches and unloads them. You can
+declare the program from a precompiled object file (above), from inline C, or
+from inline Go: see [Program sources](#program-sources).
+
+It is a meme project, built to be technically sound. The name is the frame: a
+hive holds bees, and eBPF is the swarm, many small programs living in one
+kernel, each doing one job. Terrahive is the beekeeper. It puts the bees in the
+hive, tells them where to work, and pulls them out when you are done. bpffs is
+the honeycomb: every program, map, and link is pinned to a cell so it stays put
+after the keeper walks away.
 
 ## The premise
 
