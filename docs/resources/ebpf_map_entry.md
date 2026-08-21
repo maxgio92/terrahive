@@ -1,0 +1,45 @@
+---
+page_title: "ebpf_map_entry Resource - terrahive"
+description: |-
+  Manages a single key/value pair in a pinned BPF map.
+---
+
+# ebpf_map_entry (Resource)
+
+Manages one key/value pair in a pinned BPF map. Key and value are standard
+base64 with padding. Drift is detected by looking the key up in the kernel.
+
+Use this only for map entries that are configuration: a feature flag, a rate
+limit, a config struct the program only reads. For counters and per-packet
+state the program rewrites, this resource is a machine for generating diffs.
+Leave those maps alone.
+
+## Example Usage
+
+```terraform
+resource "ebpf_map_entry" "flag" {
+  map   = ebpf_map.flags.id
+  key   = base64encode("\x01\x00\x00\x00")
+  value = base64encode("\x01\x00\x00\x00\x00\x00\x00\x00")
+}
+```
+
+## Schema
+
+### Required
+
+- `map` (String) bpffs pin path of the map, typically an `ebpf_map` ID. Forces replacement.
+- `key` (String) Map key, base64 encoded, exactly `key_size` bytes. Forces replacement.
+- `value` (String) Map value, base64 encoded, exactly `value_size` bytes.
+
+### Read-Only
+
+- `id` (String) Map pin path and base64 key, colon separated.
+
+## Import
+
+The ID is the map pin path and the base64 key, colon separated:
+
+```shell
+terraform import ebpf_map_entry.flag '/sys/fs/bpf/terrahive/map/flags:AQAAAA=='
+```
