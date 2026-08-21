@@ -16,6 +16,11 @@ jobs:
   check:
     name: fmt, vet, build, unit tests (lean)
     runs-on: ubuntu-latest
+    # Job-level boolean so the step `if` can read it (a step cannot see its
+    # own step-level env). The token itself stays out of job env and is
+    # passed only to the Codecov step, so other steps never see it.
+    env:
+      HAS_CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN != '' }}
     steps:
       - name: harden runner
         uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
@@ -52,19 +57,14 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: coverage-lean
-          path: |
-            coverage.out
-            coverage.txt
-            cover.out
-          if-no-files-found: warn
+          path: coverage.out
+          if-no-files-found: error
 
       # Codecov upload is a no-op when no token is set, so forks and
       # token-less runs stay green.
       - name: upload coverage to Codecov
-        if: ${{ env.CODECOV_TOKEN != '' }}
+        if: ${{ env.HAS_CODECOV_TOKEN == 'true' }}
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
