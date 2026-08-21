@@ -24,6 +24,25 @@ real kernel state, Delete unpins and unloads. Read
 [docs/ANTIPATTERNS.md](docs/ANTIPATTERNS.md) for every rule this breaks and why
 we broke it.
 
+## Capabilities
+
+Terrahive manages the full BPF object lifecycle through Terraform:
+
+- Load and pin BPF programs. One `ebpf_program` resource loads a program from
+  three input modes: a precompiled object file, inline C, or inline Go. See
+  [Program sources](#program-sources) below.
+- Create and pin BPF maps with `ebpf_map`, and manage individual entries with
+  `ebpf_map_entry`.
+- Attach programs to kernel hooks with eight attachment resources: `ebpf_kprobe`,
+  `ebpf_tracepoint`, `ebpf_tracing`, `ebpf_xdp`, `ebpf_tcx`, `ebpf_cgroup`,
+  `ebpf_netfilter`, and `ebpf_struct_ops`.
+- Read real kernel state on refresh, so a plan reports actual drift.
+- Pin every object to bpffs, so links keep firing after Terraform exits.
+
+Every resource maps to CRUD on the `bpf()` syscall. Create loads and pins, Read
+resolves the pin, Delete unpins and unloads. See
+[docs/ANTIPATTERNS.md](docs/ANTIPATTERNS.md) for the rules this breaks and why.
+
 ## Flavors
 
 Two binaries ship from one codebase:
@@ -97,6 +116,129 @@ sudo terraform apply
 The probe keeps firing after Terraform exits, because the link is pinned.
 `terraform destroy` unpins the link and unloads the program. See the
 [examples](examples/) directory for hello-kprobe, xdp-drop, and go-probe.
+
+## Program sources
+
+The `ebpf_program` resource takes exactly one source. The three source
+attributes are mutually exclusive: set one and only one. The program type comes
+from the ELF section name, so you rarely need to set `type`.
+
+### 1. object_file (recommended)
+
+Point at a precompiled CO-RE object. The lean `terrahive` binary is enough. No
+compiler runs at apply. Build the object yourself first:
+
+```shell
+clang -O2 -g -target bpf -c hello.bpf.c -o hello.bpf.o
+```
+
+The object must contain exactly one program. Then load and attach it:
+
+```terraform
+terraform {
+  required_providers {
+    ebpf = {
+      source = "maxgio92/terrahive"
+    }
+  }
+}
+
+provider "ebpf" {}
+
+resource "ebpf_program" "hello" {
+  name        = "hello"
+  object_file = "${path.module}/hello.bpf.o"
+}
+
+resource "ebpf_kprobe" "openat" {
+  name    = "hello-openat"
+  program = ebpf_program.hello.id
+  symbol  = "do_sys_openat2"
+}
+```
+
+### 2. c_source (inline C)
+
+Pass BPF C inline. Terrahive compiles it with the system clang at apply time,
+so clang must be on PATH. Both flavors support this mode. The `SEC()` name sets
+the program type:
+
+```terraform
+terraform {
+  required_providers {
+    ebpf = {
+      source = "maxgio92/terrahive"
+    }
+  }
+}
+
+provider "ebpf" {}
+
+resource "ebpf_program" "openat" {
+  name = "trace_openat"
+
+  c_source = <<-EOT
+    #include <linux/bpf.h>
+    #include <bpf/bpf_helpers.h>
+
+    SEC("kprobe/do_sys_openat2")
+    int trace_openat(struct pt_regs *ctx) {
+      return 0;
+    }
+
+    char _license[] SEC("license") = "GPL";
+  EOT
+}
+
+resource "ebpf_kprobe" "openat" {
+  name    = "c-openat"
+  program = ebpf_program.openat.id
+  symbol  = "do_sys_openat2"
+}
+```
+
+### 3. go_source (inline Go)
+
+Pass BPF Go inline. This mode needs the bumble flavor (`terrahive-bumble`),
+which embeds the TinyGo toolchain and compiles Go into BPF bytecode at apply
+time. The lean `terrahive` binary rejects `go_source` at plan time with a clear
+error that points you to bumble. TinyGo BPF output is experimental and often
+upsets the verifier, so treat this path as the showcase, not the safe default.
+
+```terraform
+terraform {
+  required_providers {
+    ebpf = {
+      source = "maxgio92/terrahive"
+    }
+  }
+}
+
+provider "ebpf" {}
+
+resource "ebpf_program" "counter" {
+  name = "go_counter"
+
+  # The body below is illustrative, not a working TinyGo BPF program.
+  # A real probe declares its section and helpers the way TinyGo's BPF
+  # target expects; the point here is the resource shape, not the source.
+  go_source = <<-EOT
+    package main
+
+    func probe() int {
+      return 0
+    }
+
+    func main() {}
+  EOT
+}
+
+resource "ebpf_kprobe" "counter" {
+  name    = "go-counter-openat"
+  program = ebpf_program.counter.id
+  symbol  = "do_sys_openat2"
+}
+```
 
 ## Resources
 
