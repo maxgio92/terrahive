@@ -5,7 +5,15 @@ updates:
     schedule:
       interval: weekly
     groups:
+      # Version updates: one grouped PR for all non-security bumps.
       go-dependencies:
+        applies-to: version-updates
+        patterns:
+          - "*"
+      # Security updates: one grouped PR for all advisory-driven bumps.
+      # Requires Dependabot security updates enabled in repo settings.
+      go-security:
+        applies-to: security-updates
         patterns:
           - "*"
     open-pull-requests-limit: 10
@@ -18,6 +26,11 @@ updates:
       interval: weekly
     groups:
       github-actions:
+        applies-to: version-updates
+        patterns:
+          - "*"
+      github-actions-security:
+        applies-to: security-updates
         patterns:
           - "*"
     commit-message:
