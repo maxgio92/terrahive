@@ -3,6 +3,7 @@ package provider
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 
@@ -334,6 +335,114 @@ resource "ebpf_netfilter" "test" {
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps:                    attachmentSteps(config, linkPin, "ebpf_netfilter.test"),
+		CheckDestroy:             checkDestroyed(linkPin, progPin),
+	})
+}
+
+// accUSDTFixture is what sys/sdt.h expands to: a stapsdt ELF note whose
+// "gauged" probe declares a semaphore, exercising the Address and
+// RefCtrOffset wiring in attachKprobe.
+const accUSDTFixture = `
+__extension__ unsigned short terrahive_gauged_semaphore
+    __attribute__((unused)) __attribute__((section(".probes")))
+    __attribute__((visibility("hidden"))) = 0;
+#define STAPSDT_NOTE(provider, name, semaphore)                        \
+	__asm__ __volatile__(                                          \
+	    "990: nop\n"                                               \
+	    ".pushsection .note.stapsdt,\"?\",\"note\"\n"              \
+	    ".balign 4\n"                                              \
+	    ".4byte 992f-991f, 994f-993f, 3\n"                         \
+	    "991: .asciz \"stapsdt\"\n"                                \
+	    "992: .balign 4\n"                                         \
+	    "993: .8byte 990b\n"                                       \
+	    ".8byte _.stapsdt.base\n"                                  \
+	    ".8byte " semaphore "\n"                                   \
+	    ".asciz \"" provider "\"\n"                                \
+	    ".asciz \"" name "\"\n"                                    \
+	    ".asciz \"\"\n"                                            \
+	    "994: .balign 4\n"                                         \
+	    ".popsection\n")
+__asm__(
+    ".pushsection .stapsdt.base,\"aG\",\"progbits\",.stapsdt.base,comdat\n"
+    ".weak _.stapsdt.base\n"
+    ".hidden _.stapsdt.base\n"
+    "_.stapsdt.base: .space 1\n"
+    ".size _.stapsdt.base, 1\n"
+    ".popsection\n");
+__attribute__((noinline)) int traced(void) {
+	STAPSDT_NOTE("terrahive", "gauged", "terrahive_gauged_semaphore");
+	return 0;
+}
+int main(void) { return traced(); }
+`
+
+func buildUSDTFixture(t *testing.T) string {
+	t.Helper()
+	clang, err := exec.LookPath("clang")
+	if err != nil {
+		t.Skip("clang not available to build the usdt fixture")
+	}
+	dir := t.TempDir()
+	src := filepath.Join(dir, "usdt.c")
+	bin := filepath.Join(dir, "usdt")
+	if err := os.WriteFile(src, []byte(accUSDTFixture), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := exec.Command(clang, "-O0", "-o", bin, src).CombinedOutput(); err != nil {
+		t.Fatalf("compiling usdt fixture: %v\n%s", err, out)
+	}
+	return bin
+}
+
+func TestAccUSDT(t *testing.T) {
+	pinDir := accNamedPinDir(t, "usdt")
+	progPin := pinTestProgram(t, pinDir, returnProgSpec(ebpf.Kprobe, ebpf.AttachNone, 0))
+	linkPin := filepath.Join(pinDir, "kprobe", "test")
+	bin := buildUSDTFixture(t)
+
+	config := fmt.Sprintf(`
+provider "ebpf" { pin_dir = %q }
+
+resource "ebpf_kprobe" "test" {
+  name          = "test"
+  kind          = "usdt"
+  program       = %q
+  path          = %q
+  usdt_provider = "terrahive"
+  symbol        = "gauged"
+}
+`, pinDir, progPin, bin)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps:                    attachmentSteps(config, linkPin, "ebpf_kprobe.test"),
+		CheckDestroy:             checkDestroyed(linkPin, progPin),
+	})
+}
+
+func TestAccUprobe(t *testing.T) {
+	pinDir := accNamedPinDir(t, "uprobe")
+	progPin := pinTestProgram(t, pinDir, returnProgSpec(ebpf.Kprobe, ebpf.AttachNone, 0))
+	linkPin := filepath.Join(pinDir, "kprobe", "test")
+	bin := buildUSDTFixture(t)
+
+	config := fmt.Sprintf(`
+provider "ebpf" { pin_dir = %q }
+
+resource "ebpf_kprobe" "test" {
+  name    = "test"
+  kind    = "uprobe"
+  program = %q
+  path    = %q
+  symbol  = "traced"
+}
+`, pinDir, progPin, bin)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps:                    attachmentSteps(config, linkPin, "ebpf_kprobe.test"),
 		CheckDestroy:             checkDestroyed(linkPin, progPin),
 	})
 }
