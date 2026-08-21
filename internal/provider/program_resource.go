@@ -57,7 +57,7 @@ func NewProgramResource() resource.Resource {
 }
 
 func (r *programResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_ebpf_program"
+	resp.TypeName = "ebpf_program"
 }
 
 func (r *programResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {

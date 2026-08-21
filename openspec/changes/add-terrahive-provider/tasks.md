@@ -24,14 +24,14 @@
 
 ## 4. Attachments
 
-- [ ] 4.1 `ebpf_kprobe` (kprobe, kretprobe, uprobe, uretprobe, usdt)
-- [ ] 4.2 `ebpf_tracepoint` (tracepoint, raw_tracepoint, perf_event)
-- [ ] 4.3 `ebpf_tracing` (fentry, fexit, fmod_ret, lsm, iter)
-- [ ] 4.4 `ebpf_xdp` (interface, mode)
-- [ ] 4.5 `ebpf_tcx` (interface, direction)
-- [ ] 4.6 `ebpf_cgroup` (cgroup path, attach_type)
-- [ ] 4.7 `ebpf_netfilter`
-- [ ] 4.8 `ebpf_struct_ops`
+- [x] 4.1 `ebpf_kprobe` (kprobe, kretprobe, uprobe, uretprobe, usdt)
+- [x] 4.2 `ebpf_tracepoint` (tracepoint, raw_tracepoint, perf_event)
+- [x] 4.3 `ebpf_tracing` (fentry, fexit, fmod_ret, lsm, iter)
+- [x] 4.4 `ebpf_xdp` (interface, mode)
+- [x] 4.5 `ebpf_tcx` (interface, direction)
+- [x] 4.6 `ebpf_cgroup` (cgroup path, attach_type)
+- [x] 4.7 `ebpf_netfilter`
+- [x] 4.8 `ebpf_struct_ops`
 
 ## 5. Flavors
 

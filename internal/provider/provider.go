@@ -70,6 +70,14 @@ func (p *TerrahiveProvider) Resources(_ context.Context) []func() resource.Resou
 		NewProgramResource,
 		newMapResource,
 		newMapEntryResource,
+		newKprobeResource,
+		newTracepointResource,
+		newTracingResource,
+		newXDPResource,
+		newTCXResource,
+		newCgroupResource,
+		newNetfilterResource,
+		newStructOpsResource,
 	}
 }
 

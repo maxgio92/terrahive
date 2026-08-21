@@ -31,7 +31,7 @@ char __license[] __attribute__((section("license"), used)) = "GPL";
 `
 
 var accProtoV6Factories = map[string]func() (tfprotov6.ProviderServer, error){
-	"terrahive": providerserver.NewProtocol6WithError(New("test")()),
+	"ebpf": providerserver.NewProtocol6WithError(New("test")()),
 }
 
 func accPreCheck(t *testing.T) {
@@ -63,7 +63,7 @@ func accCompile(t *testing.T, source string) string {
 }
 
 func accProviderBlock(pinDir string) string {
-	return fmt.Sprintf("provider \"terrahive\" {\n  pin_dir = %q\n}\n", pinDir)
+	return fmt.Sprintf("provider \"ebpf\" {\n  pin_dir = %q\n}\n", pinDir)
 }
 
 func TestAccProgramObjectFile(t *testing.T) {
@@ -71,7 +71,7 @@ func TestAccProgramObjectFile(t *testing.T) {
 	objPath := accCompile(t, accKprobeSource)
 
 	config := accProviderBlock(pinDir) + fmt.Sprintf(`
-resource "terrahive_ebpf_program" "probe" {
+resource "ebpf_program" "probe" {
   name        = "openat"
   object_file = %q
 }
@@ -84,10 +84,10 @@ resource "terrahive_ebpf_program" "probe" {
 			{
 				Config: config,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("terrahive_ebpf_program.probe", "id", filepath.Join(pinDir, "program", "openat")),
-					resource.TestCheckResourceAttr("terrahive_ebpf_program.probe", "type", "kprobe"),
-					resource.TestMatchResourceAttr("terrahive_ebpf_program.probe", "tag", regexp.MustCompile(`^[0-9a-f]{16}$`)),
-					resource.TestMatchResourceAttr("terrahive_ebpf_program.probe", "source_hash", regexp.MustCompile(`^[0-9a-f]{64}$`)),
+					resource.TestCheckResourceAttr("ebpf_program.probe", "id", filepath.Join(pinDir, "program", "openat")),
+					resource.TestCheckResourceAttr("ebpf_program.probe", "type", "kprobe"),
+					resource.TestMatchResourceAttr("ebpf_program.probe", "tag", regexp.MustCompile(`^[0-9a-f]{16}$`)),
+					resource.TestMatchResourceAttr("ebpf_program.probe", "source_hash", regexp.MustCompile(`^[0-9a-f]{64}$`)),
 					func(*terraform.State) error {
 						_, err := os.Stat(filepath.Join(pinDir, "program", "openat"))
 						return err
@@ -95,7 +95,7 @@ resource "terrahive_ebpf_program" "probe" {
 				),
 			},
 			{
-				ResourceName:            "terrahive_ebpf_program.probe",
+				ResourceName:            "ebpf_program.probe",
 				ImportState:             true,
 				ImportStateVerify:       true,
 				ImportStateVerifyIgnore: []string{"object_file", "source_hash"},
@@ -115,7 +115,7 @@ resource "terrahive_ebpf_program" "probe" {
 				Config: config,
 				ConfigPlanChecks: resource.ConfigPlanChecks{
 					PreApply: []plancheck.PlanCheck{
-						plancheck.ExpectResourceAction("terrahive_ebpf_program.probe", plancheck.ResourceActionDestroyBeforeCreate),
+						plancheck.ExpectResourceAction("ebpf_program.probe", plancheck.ResourceActionDestroyBeforeCreate),
 					},
 				},
 			},
@@ -127,7 +127,7 @@ func TestAccProgramCSource(t *testing.T) {
 	pinDir := accPinDir(t)
 
 	config := accProviderBlock(pinDir) + fmt.Sprintf(`
-resource "terrahive_ebpf_program" "probe" {
+resource "ebpf_program" "probe" {
   name     = "csource"
   type     = "kprobe"
   c_source = %q
@@ -141,8 +141,8 @@ resource "terrahive_ebpf_program" "probe" {
 			{
 				Config: config,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("terrahive_ebpf_program.probe", "type", "kprobe"),
-					resource.TestMatchResourceAttr("terrahive_ebpf_program.probe", "tag", regexp.MustCompile(`^[0-9a-f]{16}$`)),
+					resource.TestCheckResourceAttr("ebpf_program.probe", "type", "kprobe"),
+					resource.TestMatchResourceAttr("ebpf_program.probe", "tag", regexp.MustCompile(`^[0-9a-f]{16}$`)),
 				),
 			},
 		},
@@ -154,7 +154,7 @@ func TestAccProgramTypeAssertionMismatch(t *testing.T) {
 	objPath := accCompile(t, accKprobeSource)
 
 	config := accProviderBlock(pinDir) + fmt.Sprintf(`
-resource "terrahive_ebpf_program" "probe" {
+resource "ebpf_program" "probe" {
   name        = "mismatch"
   type        = "xdp"
   object_file = %q
@@ -183,7 +183,7 @@ func TestAccProgramExactlyOneSource(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: accProviderBlock(pinDir) + `
-resource "terrahive_ebpf_program" "probe" {
+resource "ebpf_program" "probe" {
   name = "nosource"
 }
 `,
@@ -191,7 +191,7 @@ resource "terrahive_ebpf_program" "probe" {
 			},
 			{
 				Config: accProviderBlock(pinDir) + fmt.Sprintf(`
-resource "terrahive_ebpf_program" "probe" {
+resource "ebpf_program" "probe" {
   name        = "twosources"
   object_file = %q
   c_source    = "int x;"
@@ -212,7 +212,7 @@ func TestAccProgramGoSourceRejected(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: accProviderBlock(pinDir) + `
-resource "terrahive_ebpf_program" "probe" {
+resource "ebpf_program" "probe" {
   name      = "gopher"
   go_source = "package main"
 }
@@ -229,7 +229,7 @@ func TestAccProgramDriftOnPinSwap(t *testing.T) {
 	pinPath := filepath.Join(pinDir, "program", "swapped")
 
 	config := accProviderBlock(pinDir) + fmt.Sprintf(`
-resource "terrahive_ebpf_program" "probe" {
+resource "ebpf_program" "probe" {
   name        = "swapped"
   object_file = %q
 }
@@ -270,11 +270,11 @@ resource "terrahive_ebpf_program" "probe" {
 				Config: config,
 				ConfigPlanChecks: resource.ConfigPlanChecks{
 					PreApply: []plancheck.PlanCheck{
-						plancheck.ExpectResourceAction("terrahive_ebpf_program.probe", plancheck.ResourceActionDestroyBeforeCreate),
+						plancheck.ExpectResourceAction("ebpf_program.probe", plancheck.ResourceActionDestroyBeforeCreate),
 					},
 				},
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestMatchResourceAttr("terrahive_ebpf_program.probe", "tag", regexp.MustCompile(`^[0-9a-f]{16}$`)),
+					resource.TestMatchResourceAttr("ebpf_program.probe", "tag", regexp.MustCompile(`^[0-9a-f]{16}$`)),
 					func(*terraform.State) error {
 						_, err := os.Stat(pinPath)
 						return err
