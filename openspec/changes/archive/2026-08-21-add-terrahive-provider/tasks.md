@@ -44,4 +44,4 @@
 
 - [x] 6.1 Acceptance tests under privileged CI (programs, maps, entries, kprobe, xdp)
 - [x] 6.2 Example configs: hello-kprobe (object file), xdp-drop (C), go-probe (bumble)
-- [x] 6.3 Registry docs per resource, README with the beekeeper framing and the bumblebee flight joke
+- [x] 6.3 Registry docs per resource, README with capabilities and the three program sources

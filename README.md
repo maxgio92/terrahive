@@ -24,12 +24,7 @@ they survive after Terraform exits. `destroy` detaches and unloads them. You can
 declare the program from a precompiled object file (above), from inline C, or
 from inline Go: see [Program sources](#program-sources).
 
-It is a meme project, built to be technically sound. The name is the frame: a
-hive holds bees, and eBPF is the swarm, many small programs living in one
-kernel, each doing one job. Terrahive is the beekeeper. It puts the bees in the
-hive, tells them where to work, and pulls them out when you are done. bpffs is
-the honeycomb: every program, map, and link is pinned to a cell so it stays put
-after the keeper walks away.
+It is a meme project, built to be technically sound.
 
 ## The premise
 
@@ -72,11 +67,6 @@ Two binaries ship from one codebase:
 - `terrahive-bumble`: embeds a pinned TinyGo toolchain (which statically links
   LLVM), so it compiles `go_source` into BPF bytecode at apply time. The binary
   is roughly 150 MB.
-
-According to all known laws of aviation, a bumblebee is too heavy and its wings
-too small to fly. It flies anyway. `terrahive-bumble` is 150 MB of compiler that
-has no business being inside a Terraform provider, and it flies anyway. That is
-the whole joke, and the joke has to work.
 
 ## Install
 
