@@ -196,10 +196,10 @@ func (r *mapEntryResource) Delete(ctx context.Context, req resource.DeleteReques
 	// Tolerate EINVAL only for those types, so a genuine EINVAL (e.g. a
 	// malformed key on a hash map) still surfaces.
 	err = m.Delete(key)
-	if err != nil && !errors.Is(err, ebpf.ErrKeyNotExist) {
-		if !(errors.Is(err, unix.EINVAL) && isFixedSlotMap(m.Type())) {
-			resp.Diagnostics.AddError("deleting map entry", fmt.Sprintf("map %s: %s", pinPath, err))
-		}
+	tolerated := errors.Is(err, ebpf.ErrKeyNotExist) ||
+		(errors.Is(err, unix.EINVAL) && isFixedSlotMap(m.Type()))
+	if err != nil && !tolerated {
+		resp.Diagnostics.AddError("deleting map entry", fmt.Sprintf("map %s: %s", pinPath, err))
 	}
 }
 

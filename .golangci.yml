@@ -1,0 +1,15 @@
+version: "2"
+run:
+  build-tags:
+    - bumble
+linters:
+  enable:
+    - staticcheck   # SA1019 flags use of deprecated identifiers
+    - govet
+    - ineffassign
+    - unused
+    - errcheck
+    - misspell
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
