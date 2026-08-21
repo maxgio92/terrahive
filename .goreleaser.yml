@@ -63,10 +63,36 @@ signs:
       - --detach-sign
       - "${artifact}"
 
+# SBOMs for each archive, generated with syft (goreleaser default tool).
+sboms:
+  - id: archive
+    artifacts: archive
+
 release:
   extra_files:
     - glob: terraform-registry-manifest.json
       name_template: "{{ .ProjectName }}_{{ .Version }}_manifest.json"
 
 changelog:
-  disable: true
+  use: github
+  sort: asc
+  # Group entries by conventional-commit type.
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\(.+\))??!?:.+$'
+      order: 0
+    - title: Bug fixes
+      regexp: '^.*?fix(\(.+\))??!?:.+$'
+      order: 1
+    - title: Dependencies
+      regexp: '^.*?chore\(deps\).+$'
+      order: 2
+    - title: Others
+      order: 999
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^ci:'
+      - "Merge pull request"
+      - "Merge branch"
