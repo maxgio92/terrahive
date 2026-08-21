@@ -1,0 +1,5 @@
+terraform-provider-terrahive
+dist/
+*.bpf.o
+.terraform/
+*.tfstate*
