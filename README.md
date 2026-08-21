@@ -143,9 +143,10 @@ The `ebpf_program` resource takes exactly one source. The three source
 attributes are mutually exclusive: set one and only one. The program type comes
 from the ELF section name, so you rarely need to set `type`.
 
-### 1. object_file (recommended)
+### 1. object_file
 
-Point at a precompiled CO-RE object. The lean `terrahive` binary is enough. No
+Point at a precompiled CO-RE object. This is the recommended path. The lean
+`terrahive` binary is enough. No
 compiler runs at apply. Build the object yourself first:
 
 ```shell
@@ -177,7 +178,7 @@ resource "ebpf_kprobe" "openat" {
 }
 ```
 
-### 2. c_source (inline C)
+### 2. c_source
 
 Pass BPF C inline. Terrahive compiles it with the system clang at apply time,
 so clang must be on PATH. Both flavors support this mode. The `SEC()` name sets
@@ -217,7 +218,7 @@ resource "ebpf_kprobe" "openat" {
 }
 ```
 
-### 3. go_source (inline Go)
+### 3. go_source
 
 Pass BPF Go inline. This mode needs the bumble flavor (`terrahive-bumble`),
 which embeds the TinyGo toolchain and compiles Go into BPF bytecode at apply
