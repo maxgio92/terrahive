@@ -35,6 +35,11 @@ jobs:
       - name: fetch TinyGo toolchain
         run: make fetch-tinygo
 
+      # goreleaser's sbom step shells out to syft, which is not on the
+      # runner by default.
+      - name: install syft
+        uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+
       - name: import GPG key
         uses: crazy-max/ghaction-import-gpg@2dc316deee8e90f13e1a351ab510b4d5bc0c82cd # v7.0.0
         id: import_gpg
